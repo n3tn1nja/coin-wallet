@@ -30,7 +30,7 @@ export default {
       },
     },
     powered: {
-      type: String,
+      type: Object,
       default: undefined,
     },
     isLoading: {
@@ -61,8 +61,9 @@ export default {
     fee() {
       if (!this.transaction.fee) return undefined;
       if (this.fiatMode && this.transaction.pricePlatform !== undefined) {
-        return this.$t('+{fee} fee', {
+        return this.$t('{sign}{fee} fee', {
           fee: this.$c(cryptoToFiat(this.transaction.fee, this.transaction.pricePlatform)),
+          sign: '+',
         });
       } else {
         return this.$t('{sign}{fee} {symbol} fee', {
@@ -127,7 +128,7 @@ export default {
       <CsFormTextareaReadonly
         v-if="transaction.meta?.destinationTag"
         :value="transaction.meta?.destinationTag"
-        :label="$t('Destination tag')"
+        :label="$t('Destination tag / memo')"
       />
       <CsFormTextareaReadonly
         v-if="transaction.meta?.invoiceID"
@@ -148,10 +149,6 @@ export default {
   </CsFormGroup>
 
   <CsButtonGroup>
-    <CsPoweredBy
-      v-if="powered"
-      :powered="powered"
-    />
     <CsButton
       type="primary"
       :isLoading="isLoading"
@@ -159,6 +156,10 @@ export default {
     >
       {{ $t('Confirm') }}
     </CsButton>
+    <CsPoweredBy
+      v-if="powered"
+      :powered="powered"
+    />
   </CsButtonGroup>
 </template>
 

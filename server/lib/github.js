@@ -34,7 +34,7 @@ const platforms = [{
   app: 'app',
   type: TYPE_LINK,
   pattern: /coinspacezp5mmyuicbz2hoafbnduj4vzkttq3grn5mnwdue5t343zid\.onion/ig,
-  link: 'http://coinspacezp5mmyuicbz2hoafbnduj4vzkttq3grn5mnwdue5t343zid.onion/',
+  link: 'https://coinspacezp5mmyuicbz2hoafbnduj4vzkttq3grn5mnwdue5t343zid.onion/',
 }, {
   // Windows application, update from app
   distribution: 'win',
@@ -120,6 +120,29 @@ const platforms = [{
   pattern: /galaxy\.store\/coinapp/ig,
   link: 'https://galaxy.store/coinapp',
 }, {
+  // Android AppGallery app
+  distribution: 'android-huawei',
+  arch: 'any',
+  app: 'app',
+  type: TYPE_LINK,
+  pattern: /appgallery\.huawei\.com\/app\/C112183767/ig,
+  link: 'https://appgallery.huawei.com/app/C112183767',
+}, {
+  // Android Uptodown app
+  distribution: 'android-uptodown',
+  arch: 'any',
+  app: 'app',
+  type: TYPE_LINK,
+  pattern: /coin-wallet\.en\.uptodown\.com\/android/ig,
+  link: 'https://coin-wallet.en.uptodown.com/android',
+}, {
+  // Android APK app
+  distribution: 'android-apk',
+  arch: 'any',
+  app: 'app',
+  type: TYPE_FILE,
+  pattern: /\.apk$/i,
+}, {
   // Linux snap
   distribution: 'snap',
   arch: 'any',
@@ -127,6 +150,12 @@ const platforms = [{
   type: TYPE_LINK,
   pattern: /snapcraft\.io\/coin/ig,
   link: 'https://snapcraft.io/coin',
+}, {
+  distribution: 'flatpak',
+  arch: 'any',
+  app: 'app',
+  type: TYPE_FILE,
+  pattern: /\.flatpak$/i,
 }].map(item => {
   return {
     ...item,
@@ -219,7 +248,7 @@ async function getLatest() {
           }
         }
       } else if (platform.type === TYPE_LINK) {
-        if (release.body.search(platform.pattern) !== -1) {
+        if (release.body.replace(/<!--.+-->/ig, '').search(platform.pattern) !== -1) {
           latest[platform.key] = {
             distribution: platform.distribution,
             arch: platform.arch,

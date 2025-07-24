@@ -93,7 +93,10 @@ export default {
       <CsAvatar
         class="&__header-avatar"
         :avatar="$user.avatar"
+        own
+        :class="{ '&__header-avatar--tor': $isOnion }"
         :size="80"
+        :alt="$t('Account')"
       />
       <div
         v-if="$user.username"
@@ -118,6 +121,7 @@ export default {
           <CsListItemDropdown
             v-model="currency"
             :options="currencies"
+            :aria-label="$t('Local currency')"
           />
         </template>
       </CsListItem>
@@ -128,6 +132,7 @@ export default {
           <CsListItemDropdown
             v-model="language"
             :options="languages"
+            :aria-label="$t('Language')"
           />
         </template>
       </CsListItem>
@@ -151,6 +156,16 @@ export default {
       />
     </CsListItems>
 
+    <CsListItems
+      v-if="['phonegap', 'electron'].includes(env.VITE_BUILD_TYPE)"
+      :title="$t('Privacy')"
+    >
+      <CsListItem
+        :title="$t('Tor')"
+        @click="$router.push({ name: 'settings.tor' })"
+      />
+    </CsListItems>
+
     <CsListItems :title="$t('Support')">
       <CsListItem
         :title="$t('Support (English)')"
@@ -161,11 +176,11 @@ export default {
     <CsListItems :title="$t('About')">
       <CsListItem
         :title="$t('Terms of Service')"
-        @click="$safeOpen('https://coin.space/terms-of-service/')"
+        @click="$safeOpen(`${$account.siteUrl}terms-of-service/`)"
       />
       <CsListItem
         :title="$t('Privacy Policy')"
-        @click="$safeOpen('https://coin.space/privacy-policy/')"
+        @click="$safeOpen(`${$account.siteUrl}privacy-policy/`)"
       />
     </CsListItems>
 
@@ -188,6 +203,7 @@ export default {
 <style lang="scss">
   .#{ $filename } {
     &__header {
+      z-index: 0;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -195,6 +211,7 @@ export default {
     }
 
     &__header-avatar {
+      z-index: -1;
       width: $spacing-6xl;
       height: $spacing-6xl;
     }

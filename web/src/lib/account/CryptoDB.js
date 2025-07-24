@@ -1,38 +1,70 @@
+import { SUPPORTED_PLATFORMS } from '../constants.js';
 import { deepFreeze } from '../helpers.js';
+import femver from '@suchipi/femver';
 
 export default class CryptoDB {
   #request;
-  #url = 'api/v4/cryptos';
   #db;
+  #platforms = new Map();
+  #new = [];
+  #popular = [];
 
   get all() {
     return this.#db;
   }
 
-  get coins() {
-    return this.#db.filter((item) => item.type === 'coin');
+  get new() {
+    return this.#new;
   }
 
-  get tokens() {
-    return this.#db.filter((item) => item.type === 'token');
+  get popular() {
+    return this.#popular;
   }
 
-  constructor({ request }) {
-    if (!request) {
-      throw new TypeError('request is required');
+  #isSupported(crypto) {
+    if (crypto.supported === false) {
+      return false;
+    } else if (SUPPORTED_PLATFORMS.includes(crypto.platform)) {
+      if (typeof crypto.supported === 'string' && femver.isValid(crypto.supported)) {
+        return femver.gte(import.meta.env.VITE_VERSION, crypto.supported);
+      }
+      return true;
     }
-    this.#request = request;
+    return false;
+  }
+
+  constructor({ request, account }) {
+    if (!request) throw new TypeError('request is required');
+    if (!account) throw new TypeError('account is required');
+    this.#request = (config) => {
+      return request({
+        seed: 'device',
+        ...config,
+        baseURL: account.getBaseURL('price'),
+      });
+    };
   }
 
   async init() {
     this.#db = await this.#request({
-      url: this.#url,
+      url: 'api/v1/cryptos',
       method: 'get',
-      seed: 'device',
     });
     for (const item of this.#db) {
+      item.supported = this.#isSupported(item);
       deepFreeze(item);
+      if (item.type === 'coin') {
+        this.#platforms.set(item.platform, item);
+      }
+      if (item.meta.new) {
+        this.#new.push(item);
+      }
+      if (item.meta.popular) {
+        this.#popular.push(item);
+      }
     }
+    this.#new.sort((a, b) => a.meta.new - b.meta.new);
+    this.#popular.sort((a, b) => a.meta.popular - b.meta.popular);
   }
 
   get(id) {
@@ -40,7 +72,17 @@ export default class CryptoDB {
   }
 
   platform(platform) {
-    return this.#db.find((item) => item.type === 'coin' && item.platform === platform);
+    return this.#platforms.get(platform);
+  }
+
+  platforms(platforms) {
+    const result = [];
+    for (const item of this.#platforms.values()) {
+      if (platforms.includes(item.platform)) {
+        result.push(item);
+      }
+    }
+    return result;
   }
 
   getTokenByAddress(platform, address) {

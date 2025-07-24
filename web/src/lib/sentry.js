@@ -4,15 +4,6 @@ import { CaptureConsole as CaptureConsoleIntegration } from '@sentry/integration
 import { NetworkError } from './account/Request.js';
 import { release } from './version.js';
 
-Sentry.init({
-  dsn: import.meta.env.VITE_SENTRY_DSN,
-  autoSessionTracking: false,
-  environment: import.meta.env.VITE_SENTRY_ENVIRONMENT,
-  release,
-  normalizeDepth: 5,
-  integrations: [new CaptureConsoleIntegration({ levels: ['error'] })],
-});
-
 Sentry.addGlobalEventProcessor((event, { originalException: error }) => {
   if (error instanceof NetworkError) return null;
   if (error?.name === 'NotAllowedError') return null;
@@ -23,3 +14,23 @@ Sentry.addGlobalEventProcessor((event, { originalException: error }) => {
   event.contexts = { error };
   return event;
 });
+
+export async function init() {
+  await Sentry.close().catch(console.error);
+
+  const isOnion = localStorage?.getItem('_cs_onion') === 'true';
+  const dsn = isOnion
+    ? import.meta.env.VITE_SENTRY_DSN_TOR
+    : import.meta.env.VITE_SENTRY_DSN;
+  Sentry.init({
+    dsn,
+    autoSessionTracking: false,
+    environment: import.meta.env.VITE_SENTRY_ENVIRONMENT,
+    release,
+    normalizeDepth: 5,
+    integrations: [new CaptureConsoleIntegration({ levels: ['error'] })],
+  });
+  Sentry.setTag('connection', isOnion ? 'tor' : 'web');
+}
+
+init();

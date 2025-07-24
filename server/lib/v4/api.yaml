@@ -8,6 +8,30 @@ servers:
   - url: https://coin.space/api/v4
 
 paths:
+  /country:
+    get:
+      x-eov-operation-id: getCountry
+      x-eov-operation-handler: handlers
+      description: Get country code
+      parameters:
+        - $ref: '#/components/parameters/deviceId'
+      security:
+        - deviceSignature: []
+      responses:
+        '200':
+          description: Country code
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  country:
+                    $ref: '#/components/schemas/CountryCode'
+                required:
+                  - country
+        default:
+          $ref: '#/components/responses/GeneralError'
   /crossplatform:
     get:
       x-eov-operation-id: listCrossplatformAuthenticators
@@ -240,28 +264,29 @@ paths:
                   - address
         default:
           $ref: '#/components/responses/GeneralError'
-  /exchange/changelly/estimate:
+  /exchange/{exchangeName}/estimate:
     get:
-      x-eov-operation-id: changellyEstimate
+      x-eov-operation-id: exchangeEstimate
       x-eov-operation-handler: handlers
-      description: Estimate Changelly rate
+      description: Estimate exchange rate
       parameters:
         - $ref: '#/components/parameters/deviceId'
         - $ref: '#/components/parameters/cryptoIdFrom'
         - $ref: '#/components/parameters/cryptoIdTo'
         - $ref: '#/components/parameters/amount'
+        - $ref: '#/components/parameters/exchangeName'
       security:
         - deviceSignature: []
       responses:
         '200':
-          description: Changelly estimation
+          description: Exchange estimation
           content:
             application/json:
               schema:
                 type: object
                 additionalProperties: false
                 properties:
-                  rate:
+                  rate: # remove in v5
                     $ref: '#/components/schemas/NumberString'
                   result:
                     $ref: '#/components/schemas/NumberString'
@@ -271,13 +296,14 @@ paths:
                     type: string
         default:
           $ref: '#/components/responses/GeneralError'
-  /exchange/changelly/transaction:
+  /exchange/{exchangeName}/transaction:
     post:
-      x-eov-operation-id: changellyCreateTransaction
+      x-eov-operation-id: exchangeCreateTransaction
       x-eov-operation-handler: handlers
-      description: Create Changelly transaction
+      description: Create exchange transaction
       parameters:
         - $ref: '#/components/parameters/deviceId'
+        - $ref: '#/components/parameters/exchangeName'
       requestBody:
         required: true
         content:
@@ -307,7 +333,7 @@ paths:
         - deviceSignature: []
       responses:
         '200':
-          description: Changelly transaction
+          description: Exchange transaction
           content:
             application/json:
               schema:
@@ -328,43 +354,45 @@ paths:
                   - depositAddress
         default:
           $ref: '#/components/responses/GeneralError'
-  /exchange/changelly/transactions:
+  /exchange/{exchangeName}/transactions:
     get:
-      x-eov-operation-id: changellyGetTransactions
+      x-eov-operation-id: exchangeGetTransactions
       x-eov-operation-handler: handlers
-      description: Get Changelly transactions
+      description: Get exchange transactions
       parameters:
         - $ref: '#/components/parameters/deviceId'
-        - $ref: '#/components/parameters/changellyTransactionIds'
+        - $ref: '#/components/parameters/transactionIds'
+        - $ref: '#/components/parameters/exchangeName'
       security:
         - deviceSignature: []
       responses:
         '200':
-          description: Changelly transactions
+          description: Exchange transactions
           content:
             application/json:
               schema:
                 type: array
                 maxItems: 100
                 items:
-                  $ref: '#/components/schemas/ChangellyTransaction'
+                  $ref: '#/components/schemas/ExchangeTransaction'
         default:
           $ref: '#/components/responses/GeneralError'
-  /exchange/changelly/validate:
+  /exchange/{exchangeName}/validate:
     get:
-      x-eov-operation-id: changellyValidateAddress
+      x-eov-operation-id: exchangeValidateAddress
       x-eov-operation-handler: handlers
       description: Validate crypto address
       parameters:
         - $ref: '#/components/parameters/deviceId'
         - $ref: '#/components/parameters/cryptoId'
         - $ref: '#/components/parameters/address'
-        - $ref: '#/components/parameters/changellyExtraId'
+        - $ref: '#/components/parameters/extraId'
+        - $ref: '#/components/parameters/exchangeName'
       security:
         - deviceSignature: []
       responses:
         '200':
-          description: Changelly address validation
+          description: Exchange address validation
           content:
             application/json:
               schema:
@@ -676,6 +704,25 @@ paths:
                 $ref: '#/components/schemas/Storage'
         default:
           $ref: '#/components/responses/GeneralError'
+  /storages/{storageNames}:
+    get:
+      x-eov-operation-id: getStorages
+      x-eov-operation-handler: handlers
+      description: Get storages
+      parameters:
+        - $ref: '#/components/parameters/deviceId'
+        - $ref: '#/components/parameters/storageNames'
+      security:
+        - deviceSignature: []
+      responses:
+        '200':
+          description: Storages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StorageList'
+        default:
+          $ref: '#/components/responses/GeneralError'
   /token/device/pin:
     post:
       x-eov-operation-id: tokenDevicePinVerify
@@ -939,49 +986,13 @@ components:
       pattern: ^[A-Za-z0-9_-]*$
       maxLength: 2097152
       nullable: true
-    ChangellyTransaction:
-      type: object
-      additionalProperties: false
-      properties:
-        id:
-          $ref: '#/components/schemas/AnyString256'
-        trackUrl:
-          $ref: '#/components/schemas/UrlString'
-        status:
-          $ref: '#/components/schemas/AnyString256'
-        amountTo:
-          $ref: '#/components/schemas/NumberString'
-        amountExpectedTo:
-          $ref: '#/components/schemas/NumberString'
-        amountFrom:
-          $ref: '#/components/schemas/NumberString'
-        amountExpectedFrom:
-          $ref: '#/components/schemas/NumberString'
-        cryptoFrom:
-          $ref: '#/components/schemas/CryptoId'
-        cryptoTo:
-          $ref: '#/components/schemas/CryptoId'
-        createdAt:
-          $ref: '#/components/schemas/ISODateString'
-        payinAddress:
-          $ref: '#/components/schemas/AnyCryptoAddress'
-        payinHash:
-          $ref: '#/components/schemas/AnyString256'
-        payoutAddress:
-          $ref: '#/components/schemas/AnyCryptoAddress'
-        payoutHashLink:
-          $ref: '#/components/schemas/UrlString'
-        payoutHash:
-          $ref: '#/components/schemas/AnyString256'
-        refundAddress:
-          $ref: '#/components/schemas/AnyCryptoAddress'
-        refundHashLink:
-          $ref: '#/components/schemas/UrlString'
-        refundHash:
-          $ref: '#/components/schemas/AnyString256'
-      required:
-        - status
-        - amountTo
+    CountryCode:
+      description: ISO 3166-1 alpha-2
+      type: string
+      pattern: ^[A-Z]{2}$
+      minLength: 2
+      maxLength: 2
+      nullable: true
     CryptoAmount:
       type: number
       format: float
@@ -993,7 +1004,7 @@ components:
       maxLength: 256
     CryptoIdStorage:
       type: string
-      pattern: ^[A-Za-z0-9-_]+@[a-z0-9-]+$
+      pattern: ^[A-Za-z0-9-_:]+@[a-z0-9-]+$
       maxLength: 256
     CryptoList:
       type: array
@@ -1072,6 +1083,53 @@ components:
       type: string
       pattern: ^.+\..+$
       maxLength: 256
+    ExchangeName:
+      type: string
+      pattern: ^[a-z0-9-]+$
+      maxLength: 64
+    ExchangeTransaction:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/AnyString256'
+        trackUrl:
+          $ref: '#/components/schemas/UrlString'
+        status:
+          $ref: '#/components/schemas/AnyString256'
+        amountTo:
+          $ref: '#/components/schemas/NumberString'
+        amountExpectedTo:
+          $ref: '#/components/schemas/NumberString'
+        amountFrom:
+          $ref: '#/components/schemas/NumberString'
+        amountExpectedFrom:
+          $ref: '#/components/schemas/NumberString'
+        cryptoFrom:
+          $ref: '#/components/schemas/CryptoId'
+        cryptoTo:
+          $ref: '#/components/schemas/CryptoId'
+        createdAt:
+          $ref: '#/components/schemas/ISODateString'
+        payinAddress:
+          $ref: '#/components/schemas/AnyCryptoAddress'
+        payinHash:
+          $ref: '#/components/schemas/AnyString256'
+        payoutAddress:
+          $ref: '#/components/schemas/AnyCryptoAddress'
+        payoutHashLink:
+          $ref: '#/components/schemas/UrlString'
+        payoutHash:
+          $ref: '#/components/schemas/AnyString256'
+        refundAddress:
+          $ref: '#/components/schemas/AnyCryptoAddress'
+        refundHashLink:
+          $ref: '#/components/schemas/UrlString'
+        refundHash:
+          $ref: '#/components/schemas/AnyString256'
+      required:
+        - status
+        - amountTo
     Fee:
       type: object
       additionalProperties: false
@@ -1227,6 +1285,20 @@ components:
           $ref: '#/components/schemas/Base64String'
       required:
         - data
+    StorageList:
+      type: array
+      maxItems: 25
+      items:
+        type: object
+        additionalProperties: false
+        properties:
+          _id:
+            $ref: '#/components/schemas/CryptoIdStorage'
+          data:
+            $ref: '#/components/schemas/Base64String'
+        required:
+          - _id
+          - data
     UInt64:
       type: integer
       format: int64
@@ -1357,26 +1429,6 @@ components:
         $ref: '#/components/schemas/Arch'
       required: true
       description: App architecture
-    changellyExtraId:
-      in: query
-      name: extra
-      required: false
-      description: Changelly extraId
-      schema:
-        $ref: '#/components/schemas/NullableString256'
-    changellyTransactionIds:
-      in: query
-      name: transactions
-      description: Changelly transaction ids
-      required: true
-      style: form
-      explode: false
-      allowReserved: true
-      schema:
-        type: array
-        maxItems: 10
-        items:
-          $ref: '#/components/schemas/AnyString256'
     coingeckoCurrency:
       in: query
       name: currency
@@ -1400,13 +1452,9 @@ components:
     countryCode:
       in: query
       name: countryCode
-      schema:
-        type: string
-        pattern: ^[A-Z]{2}$
-        minLength: 2
-        maxLength: 2
-        nullable: true
       description: ISO 3166-1 alpha-2
+      schema:
+        $ref: '#/components/schemas/CountryCode'
     cryptoId:
       description: Crypto ID
       in: query
@@ -1445,6 +1493,20 @@ components:
         $ref: '#/components/schemas/Distribution'
       required: true
       description: App distribution
+    exchangeName:
+      description: Exchange name
+      in: path
+      name: exchangeName
+      schema:
+        $ref: '#/components/schemas/ExchangeName'
+      required: true
+    extraId:
+      in: query
+      name: extra
+      required: false
+      description: Extra Id
+      schema:
+        $ref: '#/components/schemas/NullableString256'
     lat:
       in: query
       name: lat
@@ -1466,6 +1528,32 @@ components:
       schema:
         $ref: '#/components/schemas/CryptoIdStorage'
       required: true
+    storageNames:
+      in: path
+      name: storageNames
+      description: storageNames
+      required: true
+      style: simple
+      explode: false
+      allowReserved: true
+      schema:
+        type: array
+        maxItems: 25
+        items:
+          $ref: '#/components/schemas/CryptoIdStorage'
+    transactionIds:
+      in: query
+      name: transactions
+      description: Exchnage transaction ids
+      required: true
+      style: form
+      explode: false
+      allowReserved: true
+      schema:
+        type: array
+        maxItems: 10
+        items:
+          $ref: '#/components/schemas/AnyString256'
     version:
       in: path
       name: version

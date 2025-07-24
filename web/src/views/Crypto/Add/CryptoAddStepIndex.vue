@@ -1,6 +1,6 @@
 <script>
 import Fuse from 'fuse.js/dist/fuse.basic.esm.js';
-import { SeedRequiredError } from '../../../lib/account/Account';
+import { SeedRequiredError } from '../../../lib/account/Account.js';
 import { cryptoSubtitleWithSymbol } from '../../../lib/helpers.js';
 import { walletSeed } from '../../../lib/mixins.js';
 
@@ -12,6 +12,7 @@ import CsModal from '../../../components/CsModal.vue';
 import CsStep from '../../../components/CsStep.vue';
 import MainLayout from '../../../layouts/MainLayout.vue';
 
+import FilterIcon from '../../../assets/svg/filter.svg';
 import PlusIcon from '../../../assets/svg/plus.svg';
 import SearchIcon from '../../../assets/svg/search.svg';
 
@@ -23,6 +24,7 @@ export default {
     CsCryptoList,
     CsFormInput,
     CsModal,
+    FilterIcon,
     PlusIcon,
     SearchIcon,
   },
@@ -33,7 +35,7 @@ export default {
     let selected = undefined;
     const alreadyAdded = this.$account.wallets().map((item) => item.crypto._id);
     const cryptos = this.$account.cryptoDB.all
-      .filter((item) => item.deprecated !== true && item.supported !== false)
+      .filter((item) => item.supported && !item.deprecated)
       .filter((item) => !alreadyAdded.includes(item._id))
       .map((crypto) => {
         const platform = this.$account.cryptoDB.platform(crypto.platform);
@@ -81,12 +83,18 @@ export default {
   },
   computed: {
     coins() {
-      if (!this.query) return this.coinsList;
-      return this.coinsIndex.search(this.query).map(item => item.item);
+      const coins = this.query ? this.coinsIndex.search(this.query).map(item => item.item) : this.coinsList;
+      if (this.storage.filterPlatform) {
+        return coins.filter((item) => item.platform._id === this.storage.filterPlatform);
+      }
+      return coins;
     },
     tokens() {
-      if (!this.query) return this.tokensList;
-      return this.tokensIndex.search(this.query).map(item => item.item);
+      const tokens = this.query ? this.tokensIndex.search(this.query).map(item => item.item) : this.tokensList;
+      if (this.storage.filterPlatform) {
+        return tokens.filter((item) => item.platform._id === this.storage.filterPlatform);
+      }
+      return tokens;
     },
   },
   methods: {
@@ -142,11 +150,21 @@ export default {
           v-model="query"
           class="&__action-input"
           :placeholder="$t('Search')"
+          :ariaLabel="$t('Search')"
           small
           clear
         >
           <template #before>
             <SearchIcon />
+          </template>
+          <template #button>
+            <CsButton
+              small
+              :type="storage.filterPlatform ? 'primary-light' : 'secondary'"
+              @click="next('filterBlockchain')"
+            >
+              <FilterIcon />
+            </CsButton>
           </template>
         </CsFormInput>
       </div>
@@ -160,6 +178,12 @@ export default {
           {{ $t('Add custom token') }}
         </CsButton>
       </div>
+    </div>
+    <div
+      v-if="coins.length === 0 && tokens.length === 0"
+      class="&__message"
+    >
+      {{ $t('No coins or tokens found.') }}
     </div>
     <CsCryptoList
       :header="$t('Coins')"
@@ -231,6 +255,10 @@ export default {
         flex-basis: 50%;
         margin-bottom: 0;
       }
+    }
+
+    &__message {
+      @include text-md;
     }
 
     &__action-add-custom {

@@ -21,6 +21,10 @@ export default class Mecto {
     if (!account) throw new TypeError('account is required');
     this.#request = request;
     this.#account = account;
+    if (['mas', 'mas-dev'].includes(import.meta.env.VITE_DISTRIBUTION)) {
+      if (!window.navigator.geolocation) window.navigator.geolocation = {};
+      window.navigator.geolocation.getCurrentPosition = window.electron.getCurrentPosition;
+    }
   }
 
   async enable(address) {
@@ -67,20 +71,24 @@ export default class Mecto {
         return reject(new GeolocationNotSupported('Your browser does not support geolocation'));
       }
 
-      const options = import.meta.env.VITE_BUILD_TYPE === 'electron' ? {
-        enableHighAccuracy: true,
-      } : {};
+      const options = {
+        timeout: 30 * 1000,
+      };
 
       const alert = window.permissionDenied || window.alert;
 
       window.navigator.geolocation.getCurrentPosition(
         (position) => { resolve(position.coords); },
         (err) => {
-          alert(
-            i18n.global.t('Please enable geolocation access in Settings to continue.'),
-            i18n.global.t('OK'),
-            [i18n.global.t('Cancel'), i18n.global.t('Settings')]
-          );
+          if (['mas', 'mas-dev'].includes(import.meta.env.VITE_DISTRIBUTION)) {
+            alert(i18n.global.t('Error! Please try again later.'));
+          } else {
+            alert(
+              i18n.global.t('Please enable geolocation access in Settings to continue.'),
+              i18n.global.t('OK'),
+              [i18n.global.t('Cancel'), i18n.global.t('Settings')]
+            );
+          }
           reject(new GeolocationError('Unable to retrieve your location', {
             cause: err,
           }));

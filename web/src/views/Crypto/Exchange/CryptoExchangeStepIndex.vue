@@ -1,6 +1,7 @@
 <script>
 import {
   Amount,
+  CsWallet,
   errors,
 } from '@coinspace/cs-common';
 import {
@@ -9,7 +10,7 @@ import {
   ExchangeDisabledError,
   ExchangeSmallAmountError,
   InternalExchangeError,
-} from '../../../lib/account/ChangellyExchange.js';
+} from '../../../lib/exchanges/BaseExchange.js';
 import {
   cryptoSubtitle,
   cryptoToFiat,
@@ -21,7 +22,6 @@ import CsCryptoLogo from '../../../components/CsCryptoLogo.vue';
 import CsFormAmountInput from '../../../components/CsForm/CsFormAmountInput.vue';
 import CsFormDropdown from '../../../components/CsForm/CsFormDropdown.vue';
 import CsFormGroup from '../../../components/CsForm/CsFormGroup.vue';
-import CsPoweredBy from '../../../components/CsPoweredBy.vue';
 import CsStep from '../../../components/CsStep.vue';
 import MainLayout from '../../../layouts/MainLayout.vue';
 import { onShowOnHide } from '../../../lib/mixins';
@@ -37,7 +37,6 @@ export default {
     CsCryptoLogo,
     CsFormDropdown,
     CsFormGroup,
-    CsPoweredBy,
   },
   extends: CsStep,
   mixins: [onShowOnHide],
@@ -45,11 +44,10 @@ export default {
     return {
       isLoading: false,
       isLoadingMaxAmount: false,
+      isEstimating: false,
       subtitle: cryptoSubtitle(this.$wallet),
       amount: undefined,
       errors: {},
-      rate: undefined,
-      result: undefined,
       priceTo: undefined,
     };
   },
@@ -58,13 +56,16 @@ export default {
       this.replace('poor');
       return;
     }
+    this.isLoading = true;
     this.updateStorage({
       // cache price for all steps
       price: await this.$account.market.getPrice(this.$wallet.crypto._id, this.$currency),
       pricePlatform: await this.$account.market.getPrice(this.$wallet.platform._id, this.$currency),
       priceUSD: this.$wallet.isCsFeeSupported ?
         await this.$account.market.getPrice(this.$wallet.crypto._id, 'USD') : undefined,
+      provider: this.storage.provider || 'changelly',
     });
+    this.isLoading = false;
   },
   computed: {
     to() {
@@ -74,10 +75,20 @@ export default {
       if (this.priceTo === undefined) {
         return;
       }
-      if (this.result === undefined) {
+      if (this.estimation?.result === undefined) {
         return '0';
       }
-      return cryptoToFiat(this.result, this.priceTo);
+      return cryptoToFiat(this.estimation.result, this.priceTo);
+    },
+    providerInfo() {
+      return this.storage.provider
+        ? this.$account.exchanges.getProviderInfo(this.storage.provider)
+        : {};
+    },
+    estimation() {
+      if (this.storage.provider && this.storage.estimations) {
+        return this.storage.estimations.find((item) => item.provider === this.storage.provider);
+      }
     },
   },
   watch: {
@@ -87,8 +98,8 @@ export default {
     async to() {
       this.clean();
       this.estimate();
-      if (this.storage.to) {
-        this.priceTo = await this.$account.market.getPrice(this.storage.to.crypto._id, this.$currency);
+      if (this.to) {
+        this.priceTo = await this.$account.market.getPrice(this.to.crypto._id, this.$currency);
       } else {
         this.priceTo = undefined;
       }
@@ -96,8 +107,10 @@ export default {
   },
   methods: {
     clean() {
-      this.rate = undefined;
-      this.result = undefined;
+      this.updateStorage({
+        estimations: [],
+        provider: 'changelly',
+      });
       this.errors = {};
     },
     async estimate() {
@@ -105,62 +118,57 @@ export default {
         this.clean();
         return;
       }
-      this.isLoading = true;
+      this.isEstimating = true;
       this.errors = {};
       try {
-        if (!this.$wallet.crypto.changelly) throw new ExchangeDisabledError();
+        if (!this.$account.exchanges.isSupported(this.$wallet.crypto, this.to.crypto)) {
+          throw new ExchangeDisabledError();
+        }
         if (this.$wallet.isFeeRatesSupported) await this.$wallet.loadFeeRates();
         await this.$wallet.validateAmount({
           address: this.$wallet.dummyExchangeDepositAddress,
           // use default fee rate
-          feeRate: this.$wallet.isFeeRatesSupported ? this.$wallet.feeRates[0] : undefined,
+          feeRate: this.$wallet.isFeeRatesSupported ? CsWallet.FEE_RATE_DEFAULT : undefined,
           // use default gas limit
           gasLimit: this.$wallet.isGasLimitSupported ? this.$wallet.gasLimit : undefined,
           amount: this.amount,
           price: this.storage.priceUSD,
         });
-        const estimation = await this.$account.exchange.estimateExchange({
+        const estimations = await this.$account.exchanges.estimateExchange({
           from: this.$wallet.crypto._id,
-          to: this.storage.to.crypto._id,
+          to: this.to.crypto._id,
           amount: this.amount,
         });
-        this.rate = estimation.rate;
-        this.result = estimation.result;
+        this.updateStorage({
+          estimations,
+          provider: estimations[0].provider,
+        });
       } catch (err) {
         this.clean();
         this.handleError(err);
       } finally {
-        this.isLoading = false;
+        this.isEstimating = false;
       }
     },
     async confirm() {
-      if (!this.to) {
-        this.errors['to'] = this.$t('Please select a crypto to exchange');
+      if (!this.amount?.value) {
+        this.errors['amount'] = this.$t('Invalid value');
         return;
       }
+      if (!this.to) {
+        this.errors['to'] = this.$t('Please select a crypto to swap');
+        return;
+      }
+      if (Object.keys(this.errors).length) return;
+      if (!this.estimation) return;
+
       const amount = this.amount || new Amount(0, this.$wallet.crypto.decimals);
       this.isLoading = true;
       this.errors = {};
       try {
-        if (!this.$wallet.crypto.changelly) throw new ExchangeDisabledError();
-        if (this.$wallet.isFeeRatesSupported) await this.$wallet.loadFeeRates();
-        await this.$wallet.validateAmount({
-          address: this.$wallet.dummyExchangeDepositAddress,
-          // use default fee rate
-          feeRate: this.$wallet.isFeeRatesSupported ? this.$wallet.feeRates[0] : undefined,
-          // use default gas limit
-          gasLimit: this.$wallet.isGasLimitSupported ? this.$wallet.gasLimit : undefined,
-          amount,
-          price: this.storage.priceUSD,
-        });
-        const estimation = await this.$account.exchange.estimateExchange({
-          from: this.$wallet.crypto._id,
-          to: this.storage.to.crypto._id,
-          amount,
-        });
         const fee = await this.$wallet.estimateTransactionFee({
           address: this.$wallet.dummyExchangeDepositAddress,
-          feeRate: this.$wallet.isFeeRatesSupported ? this.$wallet.feeRates[0] : undefined,
+          feeRate: this.$wallet.isFeeRatesSupported ? CsWallet.FEE_RATE_DEFAULT : undefined,
           gasLimit: this.$wallet.isGasLimitSupported ? this.$wallet.gasLimit : undefined,
           amount,
           price: this.storage.priceUSD,
@@ -168,8 +176,8 @@ export default {
         this.updateStorage({
           exchange: true,
           amount,
-          amountTo: estimation.result,
-          address: (this.to.crypto.supported !== false && this.$account.wallet(this.to.crypto._id))
+          amountTo: this.estimation.result,
+          address: (this.to.crypto.supported && this.$account.wallet(this.to.crypto._id))
             ? 'your wallet' : undefined,
           priceTo: this.priceTo,
           fee,
@@ -187,7 +195,7 @@ export default {
         if (this.$wallet.isFeeRatesSupported) await this.$wallet.loadFeeRates();
         this.amount = await this.$wallet.estimateMaxAmount({
           address: this.$wallet.dummyExchangeDepositAddress,
-          feeRate: this.$wallet.isFeeRatesSupported ? this.$wallet.feeRates[0] : undefined,
+          feeRate: this.$wallet.isFeeRatesSupported ? CsWallet.FEE_RATE_DEFAULT : undefined,
           gasLimit: this.$wallet.gasLimit,
           price: this.storage.priceUSD,
         });
@@ -227,11 +235,13 @@ export default {
         return;
       }
       if (err instanceof ExchangeDisabledError) {
-        this.errors['amount'] = this.$t('Exchange is currently unavailable for this pair');
+        this.updateStorage({ provider: null });
+        this.errors['provider'] = this.$t('There are currently no providers available');
         return;
       }
       if (err instanceof InternalExchangeError) {
-        this.errors['amount'] = this.$t('Exchange is unavailable');
+        this.updateStorage({ provider: null });
+        this.errors['provider'] = this.$t('There are currently no providers available');
         return;
       }
       if (err instanceof errors.MinimumReserveDestinationError) {
@@ -249,8 +259,8 @@ export default {
         });
         return;
       }
-      if (err instanceof errors.InsufficientCoinForTokenTransactionError) {
-        this.errors['amount'] = this.$t('Insufficient funds for token transaction. Required {amount} {symbol}', {
+      if (err instanceof errors.InsufficientCoinForTransactionFeeError) {
+        this.errors['amount'] = this.$t('Insufficient funds to pay the transaction fee. Required {amount} {symbol}', {
           amount: err.amount,
           symbol: this.$wallet.platform.symbol,
         });
@@ -268,7 +278,7 @@ export default {
 
 <template>
   <MainLayout
-    :title="$t('Exchange {symbol}', { symbol: $wallet.crypto.symbol })"
+    :title="$t('Swap {symbol}', { symbol: $wallet.crypto.symbol })"
     :description="subtitle"
   >
     <CsFormGroup>
@@ -307,11 +317,26 @@ export default {
           />
         </template>
       </CsFormDropdown>
+      <CsFormDropdown
+        :label="$t('Provider')"
+        :error="errors['provider']"
+        :value="providerInfo.name"
+        :writable="storage.estimations?.length > 1"
+        @click="(storage.estimations?.length > 1 && next('provider'))"
+      >
+        <template #before>
+          <img
+            loading="lazy"
+            :src="providerInfo.logo"
+            :alt="providerInfo.name"
+          >
+        </template>
+      </CsFormDropdown>
       <div
-        v-if="to && result"
+        v-if="to && estimation"
         class="&__info"
       >
-        <div>{{ result }} {{ to.crypto.symbol }}</div>
+        <div>{{ estimation.result }} {{ to.crypto.symbol }}</div>
         <div v-if="amountConverted">
           {{ $c(amountConverted) }}
         </div>
@@ -319,15 +344,9 @@ export default {
     </CsFormGroup>
 
     <CsButtonGroup>
-      <div class="&__powered">
-        <div v-if="to && rate">
-          1 {{ $wallet.crypto.symbol }} ≈ {{ rate }} {{ to.crypto.symbol }}
-        </div>
-        <CsPoweredBy powered="changelly" />
-      </div>
       <CsButton
         type="primary"
-        :isLoading="isLoading"
+        :isLoading="isLoading || isEstimating"
         @click="confirm"
       >
         {{ $t('Continue') }}
@@ -346,15 +365,6 @@ export default {
 
     &__info {
       @include text-md;
-    }
-
-    &__powered {
-      @include text-xs;
-      display: flex;
-      flex-direction: column;
-      color: $secondary;
-      gap: $spacing-2xs;
-      text-align: center;
     }
   }
 </style>

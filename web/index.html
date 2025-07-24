@@ -1,38 +1,24 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="platform--<%= env.VITE_PLATFORM %>">
   <head>
     <title>Coin Wallet</title>
     <meta charset="UTF-8" />
+    <% if (env.VITE_PLATFORM === 'android') { %>
+      <meta name="color-scheme" content="light dark"/>
+    <% } %>
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
       script-src 'self' 'unsafe-eval' 'unsafe-inline' data:;
       style-src 'self' 'unsafe-inline';
       connect-src
         'self'
-        %VITE_SITE_URL%
-        %VITE_PRICE_API_URL%
-        %VITE_API_BTC_URL%
-        %VITE_API_BCH_URL%
-        %VITE_API_DASH_URL%
-        %VITE_API_DOGE_URL%
-        %VITE_API_LTC_URL%
-        %VITE_API_ETH_URL%
-        %VITE_API_ETC_URL%
-        %VITE_API_BSC_URL%
-        %VITE_API_POLYGON_URL%
-        %VITE_API_AVAX_URL%
-        %VITE_API_XRP_URL%
-        %VITE_API_XLM_URL%
-        %VITE_API_XMR_URL%
-        %VITE_API_EOS_URL%
-        %VITE_API_SOL_URL%
-        %VITE_API_TRX_URL%
-        %VITE_API_ADA_URL%
-        %VITE_API_ARB_URL%
-        %VITE_API_TON_URL%
-        %VITE_API_OP_URL%
-        %VITE_API_FTM_URL%
-        https://api.moonpay.com/
+        <% if (NODE_ENV === 'development') { %>http://localhost:*/<% } %>
+        <%= env.VITE_SITE_URL %>
+        <%= env.VITE_API_CSP %>
+        <% if (['phonegap', 'electron'].includes(env.VITE_BUILD_TYPE)) { %>
+        <%= env.VITE_SITE_URL_TOR %>
+        <%= env.VITE_API_CSP_TOR %>
+        <% } %>
         wss://*.walletconnect.org/
         wss://*.walletconnect.com/
         https://*.walletconnect.org/
@@ -44,7 +30,13 @@
         https://*.walletconnect.com/;
       img-src
         'self'
-        %VITE_SITE_URL%
+        <% if (NODE_ENV === 'development') { %>http://localhost:*/<% } %>
+        <%= env.VITE_SITE_URL %>
+        <%= env.VITE_API_CSP %>
+        <% if (['phonegap', 'electron'].includes(env.VITE_BUILD_TYPE)) { %>
+        <%= env.VITE_SITE_URL_TOR %>
+        <%= env.VITE_API_CSP_TOR %>
+        <% } %>
         https://www.gravatar.com/
         data:;
     "/>
@@ -68,6 +60,12 @@
     </style>
   </head>
   <body>
+    <noscript>
+      <div class="noscript">
+        <div class="noscript__title">JavaScript is needed</div>
+        <div class="noscript__message">Please enable it in your browser settings and refresh the page.</div>
+      </div>
+    </noscript>
     <div id="app"></div>
     <div id="error" class="error" style="display: none;">
       <div class="error__container">

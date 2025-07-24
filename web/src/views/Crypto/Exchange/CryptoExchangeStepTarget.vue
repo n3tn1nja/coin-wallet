@@ -1,6 +1,6 @@
 <script>
 import Fuse from 'fuse.js/dist/fuse.basic.esm.js';
-import { SeedRequiredError } from '../../../lib/account/Account';
+import { SeedRequiredError } from '../../../lib/account/Account.js';
 import { cryptoSubtitleWithSymbol } from '../../../lib/helpers.js';
 import { walletSeed } from '../../../lib/mixins.js';
 
@@ -12,6 +12,7 @@ import CsModal from '../../../components/CsModal.vue';
 import CsStep from '../../../components/CsStep.vue';
 import MainLayout from '../../../layouts/MainLayout.vue';
 
+import FilterIcon from '../../../assets/svg/filter.svg';
 import SearchIcon from '../../../assets/svg/search.svg';
 
 export default {
@@ -22,6 +23,7 @@ export default {
     CsCryptoList,
     CsFormInput,
     CsModal,
+    FilterIcon,
     SearchIcon,
   },
   extends: CsStep,
@@ -35,19 +37,25 @@ export default {
   },
   computed: {
     coins() {
-      if (!this.query) return this.coinsList;
-      return this.coinsIndex.search(this.query).map(item => item.item);
+      const coins = this.query ? this.coinsIndex.search(this.query).map(item => item.item) : this.coinsList;
+      if (this.storage.filterPlatform) {
+        return coins.filter((item) => item.platform._id === this.storage.filterPlatform);
+      }
+      return coins;
     },
     tokens() {
-      if (!this.query) return this.tokensList;
-      return this.tokensIndex.search(this.query).map(item => item.item);
+      const tokens = this.query ? this.tokensIndex.search(this.query).map(item => item.item) : this.tokensList;
+      if (this.storage.filterPlatform) {
+        return tokens.filter((item) => item.platform._id === this.storage.filterPlatform);
+      }
+      return tokens;
     },
   },
   beforeCreate() {
     const cryptos = this.$account.cryptoDB.all
       .filter((item) => {
-        return item.deprecated !== true
-          && item.changelly?.ticker
+        return !item.deprecated
+          && this.$account.exchanges.isSupported(this.$wallet.crypto, item)
           && item._id !== this.$wallet.crypto._id;
       })
       .map((crypto) => {
@@ -79,7 +87,7 @@ export default {
       this.updateStorage({
         to: { crypto, platform },
       });
-      if (crypto.supported === false || this.$account.wallet(crypto._id)) {
+      if (!crypto.supported || this.$account.wallet(crypto._id)) {
         this.back();
       } else {
         this.showModal = true;
@@ -126,8 +134,23 @@ export default {
           <template #before>
             <SearchIcon />
           </template>
+          <template #button>
+            <CsButton
+              small
+              :type="storage.filterPlatform ? 'primary-light' : 'secondary'"
+              @click="next('filterBlockchain')"
+            >
+              <FilterIcon />
+            </CsButton>
+          </template>
         </CsFormInput>
       </div>
+    </div>
+    <div
+      v-if="coins.length === 0 && tokens.length === 0"
+      class="&__message"
+    >
+      {{ $t('No coins or tokens found.') }}
     </div>
     <CsCryptoList
       :header="$t('Coins')"
@@ -194,11 +217,14 @@ export default {
 
     &__action-search {
       flex-basis: 100%;
-      margin-bottom: $spacing-3xl;
       @include breakpoint(lg) {
         flex-basis: 50%;
         margin-bottom: 0;
       }
+    }
+
+    &__message {
+      @include text-md;
     }
   }
 </style>

@@ -1,22 +1,9 @@
 <script>
 import CsButton from './CsButton.vue';
 
-import BTCDirectIcon from '../assets/svg/btcDirect.svg';
-import BitnovoIcon from '../assets/svg/bitnovo.svg';
-import GuardarianIcon from '../assets/svg/guardarian.svg';
-import MoonpayIcon from '../assets/svg/moonpay.svg';
-import OnramperIcon from '../assets/svg/onramper.svg';
-import PaybisIcon from '../assets/svg/paybis.svg';
-
 export default {
   components: {
     CsButton,
-    btcdirect: BTCDirectIcon,
-    bitnovo: BitnovoIcon,
-    guardarian: GuardarianIcon,
-    moonpay: MoonpayIcon,
-    onramper: OnramperIcon,
-    paybis: PaybisIcon,
   },
   props: {
     items: {
@@ -24,15 +11,12 @@ export default {
       required: true,
     },
     type: {
-      // buy or sell
+      // buy, sell, or select
       type: String,
       required: true,
     },
   },
-  data() {
-    return {
-    };
-  },
+  emits: ['click'],
   computed: {
     buttonType() {
       if (this.type === 'buy') {
@@ -40,6 +24,9 @@ export default {
       }
       if (this.type === 'sell') {
         return 'danger-light';
+      }
+      if (this.type === 'select') {
+        return 'primary-light';
       }
       return '';
     },
@@ -49,6 +36,9 @@ export default {
       }
       if (this.type === 'sell') {
         return this.$t('Sell');
+      }
+      if (this.type === 'select') {
+        return this.$t('Select');
       }
       return '';
     },
@@ -63,10 +53,12 @@ export default {
       :key="item.id"
       class="&__item"
     >
-      <component
-        :is="item.id"
+      <img
+        loading="lazy"
+        :src="item.logo"
+        :alt="item.name"
         class="&__logo"
-      />
+      >
       <div class="&__content">
         <div
           class="&__title"
@@ -85,7 +77,7 @@ export default {
         :type="buttonType"
         class="&__action"
         small
-        @click="$safeOpen(item.url)"
+        @click="() => $emit('click', item)"
       >
         {{ buttonLabel }}
       </CsButton>

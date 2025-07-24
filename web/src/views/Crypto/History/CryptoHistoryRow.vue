@@ -1,7 +1,7 @@
 <script>
 import { Transaction } from '@coinspace/cs-common';
 
-import ChangellyExchange from '../../../lib/account/ChangellyExchange.js';
+import BaseExchange from '../../../lib/exchanges/BaseExchange.js';
 import {
   cryptoToFiat,
 } from '../../../lib/helpers.js';
@@ -23,15 +23,25 @@ export default {
     description() {
       if (this.transaction.exchange) {
         if (this.transaction.incoming) {
-          return this.$t('Exchanged from {symbol}', { symbol: this.transaction.exchange.cryptoFrom.symbol });
+          return this.$t('Swapped from {symbol}', { symbol: this.transaction.exchange.cryptoFrom.symbol });
         } else {
-          return this.$t('Exchanged to {symbol}', { symbol: this.transaction.exchange.cryptoTo.symbol });
+          return this.$t('Swapped to {symbol}', { symbol: this.transaction.exchange.cryptoTo.symbol });
         }
       } else {
         if (this.transaction.incoming) {
           return this.$t('Received');
         } else {
-          return this.$t('Sent');
+          if (this.transaction.action === Transaction.ACTION_TRANSFER) {
+            return this.$t('Sent');
+          } else if (this.transaction.action === Transaction.ACTION_TOKEN_TRANSFER) {
+            return this.$t('Token transfer');
+          } else if (this.transaction.action === Transaction.ACTION_STAKING) {
+            return this.$t('Staking');
+          } else if (this.transaction.action === Transaction.ACTION_UNSTAKING) {
+            return this.$t('Unstaking');
+          } else if (this.transaction.action === Transaction.ACTION_SMART_CONTRACT_CALL) {
+            return this.$t('Smart contract call');
+          }
         }
       }
     },
@@ -39,19 +49,19 @@ export default {
       if (this.transaction.exchange) {
         const { status } = this.transaction.exchange;
         const { timestamp } = this.transaction;
-        if (status === ChangellyExchange.STATUS_PENDING) {
+        if (status === BaseExchange.STATUS_PENDING) {
           return this.$t('Pending');
-        } else if (status === ChangellyExchange.STATUS_EXCHANGING) {
+        } else if (status === BaseExchange.STATUS_EXCHANGING) {
           return this.$t('Exchanging');
-        } else if (status === ChangellyExchange.STATUS_SUCCESS) {
+        } else if (status === BaseExchange.STATUS_SUCCESS) {
           return this.formatDate(timestamp);
-        } else if (status === ChangellyExchange.STATUS_REQUIRED_TO_ACCEPT) {
+        } else if (status === BaseExchange.STATUS_REQUIRED_TO_ACCEPT) {
           return this.$t('Required to accept');
-        } else if (status === ChangellyExchange.STATUS_HOLD) {
+        } else if (status === BaseExchange.STATUS_HOLD) {
           return this.$t('On hold');
-        } else if (status === ChangellyExchange.STATUS_REFUNDED) {
+        } else if (status === BaseExchange.STATUS_REFUNDED) {
           return this.$t('Refunded');
-        } else if (status === ChangellyExchange.STATUS_FAILED) {
+        } else if (status === BaseExchange.STATUS_FAILED) {
           return this.$t('Failed');
         }
       } else {

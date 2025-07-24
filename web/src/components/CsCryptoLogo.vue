@@ -1,8 +1,10 @@
 <script>
+import BlockchainIcon from '../assets/svg/blockchain.svg';
 import TokenIcon from '../assets/svg/token.svg';
 
 export default {
   components: {
+    BlockchainIcon,
     TokenIcon,
   },
   props: {
@@ -17,7 +19,7 @@ export default {
   },
   data() {
     return {
-      baseUrl: this.env.VITE_SITE_URL,
+      baseUrl: this.$account.siteUrl,
       version: this.env.VITE_VERSION,
       cryptoLogoError: false,
       platformLogoError: false,
@@ -33,8 +35,13 @@ export default {
       loading="lazy"
       class="&__crypto"
       :src="`${baseUrl}assets/crypto/${crypto.logo}?ver=${version}`"
+      :alt="crypto.name"
       @error="cryptoLogoError = true"
     >
+    <BlockchainIcon
+      v-else-if="crypto.type === 'custom'"
+      class="&__crypto"
+    />
     <TokenIcon
       v-else
       class="&__crypto"
@@ -45,6 +52,7 @@ export default {
         loading="lazy"
         class="&__platform"
         :src="`${baseUrl}assets/crypto/${platform.logo}?ver=${version}`"
+        :alt="platform.name"
         @error="platformLogoError = true"
       >
       <TokenIcon

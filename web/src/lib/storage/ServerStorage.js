@@ -32,16 +32,18 @@ export default class ServerStorage {
     return {};
   }
 
-  async init() {
+  async init(data) {
     if (this.#status !== undefined) {
       throw new Error('ServerStorage already initialized');
     }
     this.#status = 'initializing';
-    const { data } = await this.#request({
-      url: this.#url,
-      method: 'get',
-      seed: 'device',
-    });
+    if (data === undefined) {
+      ({ data } = await this.#request({
+        url: this.#url,
+        method: 'get',
+        seed: 'device',
+      }));
+    }
     if (data) {
       this.#json = decrypt(data, this.#key);
       this.#storage = JSON.parse(this.#json);
@@ -96,6 +98,9 @@ export default class ServerStorage {
   }
 
   delete(key) {
+    if (this.#status !== 'ready') {
+      throw new Error('ServerStorage not ready');
+    }
     if (key === undefined) {
       throw new TypeError('key must be set');
     }

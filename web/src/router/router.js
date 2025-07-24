@@ -1,4 +1,3 @@
-import * as EOSSymbols from '@coinspace/cs-eos-wallet/symbols';
 import { CsWallet } from '@coinspace/cs-common';
 import { ref } from 'vue';
 import {
@@ -46,10 +45,13 @@ router.beforeEach((to, from) => {
     if (wallet) {
       setWalletProps($app, wallet);
       registerProtocolHandler(wallet.crypto, $account);
-    } else if ($account.cryptoDB.get(to.params.cryptoId)) {
-      return { name: 'crypto.add', replace: true, params: { cryptoId: to.params.cryptoId } };
     } else {
-      return { name: 'home', replace: true };
+      const crypto = $account.cryptoDB.get(to.params.cryptoId);
+      if (crypto?.supported && !crypto?.deprecated) {
+        return { name: 'crypto.add', replace: true, params: { cryptoId: to.params.cryptoId } };
+      } else {
+        return { name: 'home', replace: true };
+      }
     }
   }
   const toDepth = to.path.split('/').length;
@@ -86,10 +88,12 @@ if (import.meta.env.VITE_BUILD_TYPE === 'phonegap' ||
   };
 }
 
+const walletState = ref(undefined);
+
 function setWalletProps($app, wallet) {
   const { $account } = router;
   defineAppProperty($app, '$wallet', wallet);
-  const walletState = ref(wallet.state);
+  walletState.value = wallet.state;
   defineAppProperty($app, '$walletState', walletState);
 
   const $loadWallet = async () => {
@@ -102,27 +106,19 @@ function setWalletProps($app, wallet) {
     } catch (err) {
       console.error(err);
     }
-    walletState.value = wallet.state;
+    walletState.value = $app.config.globalProperties.$wallet?.state;
   };
   defineAppProperty($app, '$loadWallet', $loadWallet);
 
   if (wallet.state !== CsWallet.STATE_LOADED) {
     $loadWallet();
   }
-  defineAppProperty($app, '$STATE_LOADING', CsWallet.STATE_LOADING);
-  defineAppProperty($app, '$STATE_LOADED', CsWallet.STATE_LOADED);
-  defineAppProperty($app, '$STATE_NEED_ACTIVATION', EOSSymbols.STATE_NEED_ACTIVATION);
-  defineAppProperty($app, '$STATE_ERROR', CsWallet.STATE_ERROR);
 }
 
 function unsetWalletProps($app) {
-  delete $app.config.globalProperties.$wallet;
-  delete $app.config.globalProperties.$walletState;
-  delete $app.config.globalProperties.$loadWallet;
-  delete $app.config.globalProperties.$STATE_LOADING;
-  delete $app.config.globalProperties.$STATE_LOADED;
-  delete $app.config.globalProperties.$STATE_NEED_ACTIVATION;
-  delete $app.config.globalProperties.$STATE_ERROR;
+  defineAppProperty($app, '$wallet', undefined);
+  defineAppProperty($app, '$loadWallet', undefined);
+  walletState.value = undefined;
 }
 
 export default router;

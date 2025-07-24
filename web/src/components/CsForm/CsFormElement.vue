@@ -15,6 +15,10 @@ export default {
       type: String,
       default: undefined,
     },
+    ariaLabel: {
+      type: String,
+      default: undefined,
+    },
     error: {
       type: [Boolean, String],
       default: false,
@@ -49,8 +53,16 @@ export default {
       '&--has-error': error,
     }"
   >
-    <div class="&__container">
-      <label class="&__control">
+    <div
+      class="&__container"
+      :class="{
+        '&__container--with-button': $slots.button,
+      }"
+    >
+      <label
+        class="&__control"
+        :aria-label="ariaLabel"
+      >
         <div
           v-if="label"
           class="&__label"
@@ -73,10 +85,13 @@ export default {
         v-if="info"
         type="base"
         class="&__info"
+        :title="$t('Info')"
+        :aria-label="$t('Info')"
         @click="showInfo = true"
       >
         <InfoIcon />
       </CsButton>
+      <slot name="button" />
     </div>
     <div
       v-if="error"
@@ -111,6 +126,10 @@ export default {
     &__container {
       display: flex;
       align-items: flex-end;
+
+      &--with-button {
+        gap: $spacing-lg;
+      }
     }
 
     &__control {
@@ -170,7 +189,7 @@ export default {
 
     &--small {
       #{ $self }__box {
-        min-height: 2.5rem;
+        min-height: 2.75rem;
       }
     }
 

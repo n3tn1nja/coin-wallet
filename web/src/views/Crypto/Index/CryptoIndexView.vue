@@ -37,15 +37,18 @@ export default {
   },
   data() {
     return {
-      marketState: undefined, // $STATE_LOADING, $STATE_LOADED, $STATE_ERROR
       period: '1D',
+      chartPoint: undefined,
+      chartSeries: [],
+      isLoadingChart: true,
+      chartError: false,
       showConfirmRemove: false,
       subtitleWithSymbol: cryptoSubtitleWithSymbol(this.$wallet),
     };
   },
   computed: {
     isLoading() {
-      return this.$walletState === this.$STATE_LOADING || this.marketState === this.$STATE_LOADING;
+      return this.$walletState === this.$STATE_LOADING;
     },
     price() {
       return this.market?.price || 0;
@@ -73,14 +76,37 @@ export default {
         this.loadPriceChart(),
       ]);
     },
-    async loadPriceChart() {
-      this.marketState = this.$STATE_LOADING;
+    async loadPriceChart(period = this.period) {
+      this.isLoadingChart = true;
+      this.chartError = false;
       try {
-        await this.$refs.priceChart?.load();
-        this.marketState = this.$STATE_LOADED;
+        await CsPriceChart.loadApex();
+        this.period = period;
+        if (!this.$wallet) return;
+        const prices = await this.$account.market.getChartData(
+          this.$wallet.crypto._id,
+          period,
+          this.$currency
+        );
+        this.chartSeries = prices;
       } catch (err) {
         console.error(err);
-        this.marketState = this.$STATE_ERROR;
+        this.chartError = true;
+      } finally {
+        this.isLoadingChart = false;
+      }
+    },
+    setChartPoint(chartPoint) {
+      if (chartPoint) {
+        const timestamp = new Date(chartPoint[0]);
+        const isCurrentYear = timestamp.getFullYear() === (new Date()).getFullYear();
+        const format = this.period === '1Y' ? 'chart1Y' : (isCurrentYear ? 'shortCurrentYear': 'short');
+        this.chartPoint = {
+          timestamp: this.$d(chartPoint[0], format),
+          price: chartPoint[1],
+        };
+      } else {
+        this.chartPoint = undefined;
       }
     },
     async remove() {
@@ -104,6 +130,8 @@ export default {
       >
         <template #left>
           <CsNavbarButton
+            :title="$t('Back')"
+            :aria-label="$t('Back')"
             @click="back"
           >
             <ArrowLeftIcon />
@@ -126,29 +154,28 @@ export default {
         <CryptoIndexPrice
           :price="price"
           :change="change"
-          :marketState="marketState"
+          :chartPoint="chartPoint"
         />
         <CryptoIndexBuySell />
       </div>
       <CsPriceChart
         v-if="$wallet.crypto.coingecko"
-        ref="priceChart"
-        v-model:period="period"
-        class="&__price-chart"
-        :crypto="$wallet.crypto"
+        :chartSeries="chartSeries"
+        :period="period"
+        :isLoading="isLoadingChart"
+        :error="chartError"
+        @changePeriod="loadPriceChart"
+        @crosshair="setChartPoint"
       />
     </div>
-    <CryptoIndexBalance
-      :price="price"
-      :marketState="marketState"
-    />
+    <CryptoIndexBalance :price="price" />
     <CryptoIndexActions />
 
     <div
       v-if="$walletState === $STATE_ERROR"
       class="&__error"
     >
-      {{ $t('Error! Please try again later.') }}
+      {{ $account.unknownError() }}
     </div>
     <CryptoIndexSetupEOS />
 
@@ -179,11 +206,6 @@ export default {
       align-items: flex-start;
       justify-content: space-between;
       gap: $spacing-lg;
-    }
-
-    &__price-chart {
-      margin-right: calc(-1 * max($spacing-xl, env(safe-area-inset-right)));
-      margin-left: calc(-1 * max($spacing-xl, env(safe-area-inset-left)));
     }
 
     &__error {

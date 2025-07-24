@@ -101,19 +101,21 @@ export default {
         this.$router.up();
       }
     },
-    getContentPosition() {
+    getContentRect() {
       const container = this.$refs.container.getBoundingClientRect();
       const content = this.$refs.content.getBoundingClientRect();
       return {
         top: content.top - container.top,
         bottom: container.bottom - content.bottom,
+        height: content.height,
       };
     },
     // Infinite scroll
     handleScroll() {
       if (this.isLoading) return;
       if (this.isLoadedAll) return;
-      const { bottom } = this.getContentPosition();
+      const { bottom, height } = this.getContentRect();
+      if (!height) return;
       if (bottom + this.loadMoreOffset >= 0) {
         this.onLoadMore();
       }
@@ -122,7 +124,8 @@ export default {
     handleTouchStart(e) {
       if (this.isLoading) return;
       if (this.hasTransition) return;
-      const { top } = this.getContentPosition();
+      if (e.target.hasAttribute('data-prevent-scroll')) return;
+      const { top } = this.getContentRect();
       if (top < 0) return;
       this.touchStartY = e.touches.item(0).pageY;
     },
@@ -227,6 +230,7 @@ export default {
       flex-direction: column;
       align-items: center;
       overflow-y: auto;
+      scrollbar-width: thin;
 
       &--pulling {
         overflow-y: hidden;

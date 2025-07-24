@@ -1,6 +1,5 @@
-import ExpiryMap from 'expiry-map';
 import axios from 'axios';
-import pMemoize from 'p-memoize';
+import { dbMemoize } from '../db.js';
 
 const API_KEY = process.env.GUARDARIAN_API_KEY;
 const rampData = {
@@ -14,15 +13,15 @@ const rampApi = axios.create({
   headers: { 'x-api-key': API_KEY },
 });
 
-async function buy(countryCode, crypto, walletAddress) {
-  return ramp('buy', countryCode, crypto, walletAddress);
+async function buy({ countryCode, crypto, address }) {
+  return ramp('buy', countryCode, crypto, address);
 }
 
-async function sell(countryCode, crypto) {
+async function sell({ countryCode, crypto }) {
   return ramp('sell', countryCode, crypto);
 }
 
-async function ramp(type, countryCode, crypto, walletAddress) {
+async function ramp(type, countryCode, crypto, address) {
   if (!API_KEY) return;
   if (!crypto) return;
   const countries = await cachedCountries();
@@ -54,7 +53,7 @@ async function ramp(type, countryCode, crypto, walletAddress) {
   }]));
 
   if (type === 'buy') {
-    url.searchParams.set('payout_address', walletAddress);
+    url.searchParams.set('payout_address', address);
   }
 
   return {
@@ -63,15 +62,15 @@ async function ramp(type, countryCode, crypto, walletAddress) {
   };
 }
 
-const cachedCurrencies = pMemoize(async () => {
+const cachedCurrencies = dbMemoize(async () => {
   const { data } = await rampApi.get('/v1/currencies/crypto');
   return data.filter((item) => item.enabled);
-}, { cache: new ExpiryMap(1 * 60 * 60 * 1000) }); // 1 hour
+}, { key: 'guardarian-currencies-crypto', ttl: 1 * 60 * 60 }); // 1 hour
 
-const cachedCountries = pMemoize(async () => {
+const cachedCountries = dbMemoize(async () => {
   const { data } = await rampApi.get('/v1/countries');
   return data;
-}, { cache: new ExpiryMap(1 * 60 * 60 * 1000) }); // 1 hour
+}, { key: 'guardarian-countries', ttl: 1 * 60 * 60 }); // 1 hour
 
 export default {
   buy,

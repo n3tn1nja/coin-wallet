@@ -1,12 +1,11 @@
-import ExpiryMap from 'expiry-map';
 import axios from 'axios';
-import pMemoize from 'p-memoize';
+import { dbMemoize } from '../db.js';
 
 const API_KEY = process.env.BTCDIRECT_API_KEY;
 const rampData = {
   id: 'btcdirect',
   name: 'BTC Direct',
-  description: 'Crypto broker since 2013',
+  description: 'Most payment options',
 };
 const rampApi = axios.create({
   baseURL: `https://api${process.env.NODE_ENV === 'production' ? '' : '-sandbox'}.btcdirect.eu/`,
@@ -14,7 +13,7 @@ const rampApi = axios.create({
   headers: { 'x-api-key': API_KEY },
 });
 
-async function buy(countryCode, crypto, walletAddress) {
+async function buy({ countryCode, crypto, address }) {
   if (!API_KEY) return;
   if (!crypto) return;
   const countries = await cachedCountries();
@@ -31,7 +30,7 @@ async function buy(countryCode, crypto, walletAddress) {
 
   if (currency.buy && currency.buy.status === 'enabled') {
     const url = new URL('/api/v3/btcdirect/buy', process.env.SITE_URL);
-    url.searchParams.set('address', walletAddress);
+    url.searchParams.set('address', address);
     url.searchParams.set('baseCurrency', currency.baseCurrency.code);
     return {
       ...rampData,
@@ -43,16 +42,15 @@ async function buy(countryCode, crypto, walletAddress) {
 
 async function sell() {}
 
-const cachedCurrencies = pMemoize(async () => {
+const cachedCurrencies = dbMemoize(async () => {
   const { data } = await rampApi.get('/api/v1/system/currency-pairs');
   return data;
+}, { key: 'btcdirect-currency-pairs', ttl: 1 * 60 * 60 }); // 1 hour
 
-}, { cache: new ExpiryMap(1 * 60 * 60 * 1000) }); // 1 hour
-
-const cachedCountries = pMemoize(async () => {
+const cachedCountries = dbMemoize(async () => {
   const { data } = await rampApi.get('/api/v1/system/info');
   return data.nationalities;
-}, { cache: new ExpiryMap(1 * 60 * 60 * 1000) }); // 1 hour
+}, { key: 'btcdirect-info', ttl: 1 * 60 * 60 }); // 1 hour
 
 export default {
   buy,

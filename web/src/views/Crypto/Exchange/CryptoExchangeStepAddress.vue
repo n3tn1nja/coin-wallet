@@ -1,5 +1,5 @@
 <script>
-import ChangellyExchange from '../../../lib/account/ChangellyExchange.js';
+import BaseExchange from '../../../lib/exchanges/BaseExchange.js';
 import { errors } from '@coinspace/cs-common';
 
 import CsButton from '../../../components/CsButton.vue';
@@ -46,7 +46,6 @@ export default {
   mixins: [onShowOnHide],
   async onShow() {
     if (this.args?.error) {
-      console.error(this.args.error);
       this.error = this.$t('Invalid address');
     }
     if (this.storage.temp?.address) {
@@ -114,17 +113,18 @@ export default {
         this.isLoading = true;
         this.error = undefined;
         try {
-          await this.$account.exchange.validateAddress({
+          await this.$account.exchanges.validateAddress({
             to: this.storage.to.crypto._id,
             address: this.address,
             extraId: this.extraId,
+            provider: this.storage.provider,
           });
           this.updateStorage({
             address: this.address,
             alias: this.alias,
             extraId: this.extraId,
           });
-          if (ChangellyExchange.EXTRA_ID.includes(this.storage.to.crypto._id) && this.extraId === undefined) {
+          if (BaseExchange.EXTRA_ID.includes(this.storage.to.crypto._id) && this.extraId === undefined) {
             this.next('meta');
           } else {
             this.next('confirm');
@@ -157,7 +157,7 @@ export default {
 
 <template>
   <MainLayout
-    :title="$t('Exchange {symbol}', { symbol: $wallet.crypto.symbol })"
+    :title="$t('Swap {symbol}', { symbol: $wallet.crypto.symbol })"
     :description="subtitle"
   >
     <CsFormGroup class="&__container">
@@ -221,7 +221,7 @@ export default {
           {{ $t('Paste') }}
         </CsButton>
         <CsButton
-          v-if="storage.to.crypto.supported !== false"
+          v-if="storage.to.crypto.supported"
           type="circle"
           @click="next('mecto')"
         >
@@ -243,7 +243,6 @@ export default {
       </CsButtonGroup>
     </CsFormGroup>
     <CsButtonGroup>
-      <CsPoweredBy powered="changelly" />
       <CsButton
         type="primary"
         :isLoading="isLoading"
@@ -251,6 +250,7 @@ export default {
       >
         {{ $t('Continue') }}
       </CsButton>
+      <CsPoweredBy :powered="$account.exchanges.getProviderInfo(storage.provider)" />
     </CsButtonGroup>
   </MainLayout>
 </template>

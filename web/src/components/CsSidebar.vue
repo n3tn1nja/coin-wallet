@@ -23,7 +23,6 @@ export default {
   data() {
     return {
       portfolioBalance: 0,
-      portfolioBalanceChange: 0,
       portfolioBalanceChangePercent: 0,
       changePeriod: '1D',
     };
@@ -54,7 +53,6 @@ export default {
           }
         }
         this.portfolioBalance = portfolioBalance;
-        this.portfolioBalanceChange = portfolioBalanceChange;
         this.portfolioBalanceChangePercent = portfolioBalance ? portfolioBalanceChange / portfolioBalance : 0;
       },
       immediate: true,
@@ -75,7 +73,9 @@ export default {
         <CsAvatar
           class="&__avatar"
           :avatar="$user.avatar"
+          own
           :size="48"
+          :alt="$t('Settings')"
         />
       </CsButton>
       <div
@@ -93,14 +93,12 @@ export default {
       <div
         class="&__portfolio-change"
         :class="{
-          '&__portfolio-change--positive': !$isHiddenBalance && portfolioBalanceChange > 0,
-          '&__portfolio-change--negative': !$isHiddenBalance && portfolioBalanceChange < 0
+          '&__portfolio-change--positive': !$isHiddenBalance && portfolioBalanceChangePercent > 0,
+          '&__portfolio-change--negative': !$isHiddenBalance && portfolioBalanceChangePercent < 0
         }"
       >
         <template v-if="!$isHiddenBalance">
-          {{ $n(portfolioBalanceChange, 'currency', {
-            currency: $currency,
-          }) }} ({{ $n(portfolioBalanceChangePercent, 'percent') }}) {{ $t('24h') }}
+          {{ $n(portfolioBalanceChangePercent, 'percent') }} ({{ $t('1 day') }})
         </template>
         <template v-else>
           *****
@@ -117,14 +115,15 @@ export default {
         :changePeriod="changePeriod"
         @select="(id) => $router.push({ name: 'crypto', params: { cryptoId: id }})"
       />
-      <CsButton
-        type="primary-link"
-        class="&__add-crypto"
-        @click="$router.push({ name: 'crypto.add' })"
-      >
-        <PlusIcon />
-        {{ $t('Add crypto') }}
-      </CsButton>
+      <div class="&__add-crypto">
+        <CsButton
+          type="primary-link"
+          @click="$router.push({ name: 'crypto.add', force: true })"
+        >
+          <PlusIcon />
+          {{ $t('Add crypto') }}
+        </CsButton>
+      </div>
     </div>
   </div>
 </template>
@@ -205,6 +204,7 @@ export default {
       gap: $spacing-2xs;
       @include breakpoint(lg) {
         overflow-y: auto;
+        scrollbar-width: thin;
       }
     }
 
@@ -213,7 +213,10 @@ export default {
     }
 
     &__add-crypto {
-      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+      justify-content: flex-end;
     }
   }
 </style>

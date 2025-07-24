@@ -99,7 +99,7 @@ export default {
       </CsButton>
       <CsButton
         type="primary-link"
-        @click="$safeOpen('https://coin.space/terms-of-service/')"
+        @click="$safeOpen(`${$account.siteUrl}terms-of-service/`)"
       >
         {{ $t('View Terms of Service') }}
       </CsButton>

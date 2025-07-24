@@ -74,6 +74,9 @@ export default {
     <div
       v-if="clear && modelValue"
       class="&__icon-after"
+      role="button"
+      :title="$t('Clear')"
+      :aria-label="$t('Clear')"
       @click="$emit('update:modelValue', '')"
     >
       <CloseIcon />
@@ -86,6 +89,12 @@ export default {
       #infoFooter
     >
       <slot name="infoFooter" />
+    </template>
+    <template
+      v-if="$slots.button"
+      #button
+    >
+      <slot name="button" />
     </template>
   </CsFormElement>
 </template>

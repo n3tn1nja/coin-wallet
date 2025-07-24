@@ -12,6 +12,10 @@ export default {
       type: Number,
       default: 48,
     },
+    own: {
+      type: Boolean,
+      default: false,
+    },
   },
   computed: {
     src() {
@@ -30,6 +34,10 @@ export default {
 <template>
   <img
     class="&"
+    :class="{
+      '&--own': own,
+      '&--own-tor': own && ($isOnion || env.VITE_DISTRIBUTION === 'tor'),
+    }"
     :src="src"
   >
 </template>
@@ -39,6 +47,22 @@ export default {
     width: $spacing-4xl;
     height: $spacing-4xl;
     border-radius: 50%;
+    animation: fix-ios 0.2s ease-in; // fix safari bug with initial render
     box-shadow: 0 $spacing-md $spacing-xl rgb(0 0 0 / 8%);
+
+    &--own {
+      outline: 2px solid transparent;
+      transition: all 0.1s ease-out;
+    }
+
+    &--own-tor {
+      box-shadow: 0 $spacing-md $spacing-xl rgb(138 43 226 / 8%);
+      outline: 2px solid #8a2be2;
+    }
+
+    @keyframes fix-ios {
+      0% { opacity: 1; }
+      100% { opacity: 1; }
+    }
   }
 </style>

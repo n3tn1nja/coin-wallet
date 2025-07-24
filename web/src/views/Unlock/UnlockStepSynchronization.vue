@@ -1,12 +1,10 @@
 <script>
-import { CsWallet } from '@coinspace/cs-common';
-
 import AuthStepLayout from '../../layouts/AuthStepLayout.vue';
 import CsButton from '../../components/CsButton.vue';
 import CsButtonGroup from '../../components/CsButtonGroup.vue';
 import CsStep from '../../components/CsStep.vue';
 
-import { walletSeed } from '../../lib/mixins.js';
+import { redirectToApp, walletSeed } from '../../lib/mixins.js';
 
 export default {
   components: {
@@ -15,7 +13,7 @@ export default {
     CsButtonGroup,
   },
   extends: CsStep,
-  mixins: [walletSeed],
+  mixins: [redirectToApp, walletSeed],
   data() {
     return {
       isLoading: false,
@@ -25,23 +23,27 @@ export default {
     async confirm() {
       this.isLoading = true;
       await this.walletSeed(async (walletSeed) => {
-        for (const wallet of this.$account.wallets('coin')) {
-          if (wallet.state === CsWallet.STATE_NEED_INITIALIZATION) {
-            await this.$account.initWallet(wallet, walletSeed);
-          }
-        }
-        this.args.redirect();
+        await this.$account.initWallets(this.$account.walletsNeedSynchronization, walletSeed);
+
+        this.done();
       }, { layout: 'AuthStepLayout' });
       this.isLoading = false;
+    },
+    done() {
+      if (this.$account.cryptosToSelect) {
+        this.next('selectCryptos');
+      } else {
+        this.redirectToApp();
+      }
     },
   },
 };
 </script>
 
 <template>
-  <AuthStepLayout :title="$t('Derivation path')">
+  <AuthStepLayout :title="$t('Synchronization')">
     <div class="&__description">
-      <div>{{ $t('Derivation path was updated.') }}</div>
+      <div>{{ $t('Wallet settings have been updated.') }}</div>
       <div>{{ $t('Please confirm synchronization with this device.') }}</div>
     </div>
 

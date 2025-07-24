@@ -1,4 +1,3 @@
-import ExchangeStorage from './ExchangeStorage.js';
 import {
   Amount,
   errors,
@@ -8,29 +7,51 @@ import { areAddressesEqual as areTonAddressesEqual } from '@coinspace/cs-toncoin
 
 export class ExchangeDisabledError extends Error {
   name = 'ExchangeDisabledError';
+  constructor(message, options) {
+    super(message, options);
+    this.provider = options?.provider;
+  }
 }
 
 export class InternalExchangeError extends Error {
   name = 'InternalExchangeError';
+  constructor(message, options) {
+    super(message, options);
+    this.provider = options?.provider;
+  }
 }
 
 export class ExchangeAmountError extends errors.AmountError {
   name = 'ExchangeAmountError';
+  constructor(message, options) {
+    super(message, options);
+    this.provider = options?.provider;
+  }
 }
 
 export class ExchangeSmallAmountError extends errors.SmallAmountError {
   name = 'ExchangeSmallAmountError';
+  constructor(message, options) {
+    super(message, options);
+    this.provider = options?.provider;
+  }
 }
 
 export class ExchangeBigAmountError extends errors.BigAmountError {
   name = 'ExchangeBigAmountError';
+  constructor(message, options) {
+    super(message, options);
+    this.provider = options?.provider;
+  }
 }
 
-export default class ChangellyExchange {
+export default class BaseExchange {
+  #id;
   #request;
   #account;
   #storage;
   #exchanges;
+  #info;
 
   static STATUS_PENDING = Symbol('PENDING');
   static STATUS_EXCHANGING = Symbol('EXCHANGING');
@@ -44,31 +65,47 @@ export default class ChangellyExchange {
     'xrp@ripple',
     'stellar@stellar',
     'eos@eos',
-    'binance-coin@binance-chain',
-    'monero@monero',
-    'ardor@ardor',
-    'nem@nem',
     'stacks@stacks',
     'iost@iost',
   ];
 
-  constructor({ request, account }) {
-    if (!request) throw new TypeError('request is required');
-    if (!account) throw new TypeError('account is required');
-    this.#request = request;
-    this.#account = account;
-    this.#storage = new ExchangeStorage({
-      request,
-      name: 'changelly',
-      key: account.clientStorage.getDetailsKey(),
-    });
+  get id() {
+    return this.#id;
   }
 
-  async init() {
-    await this.#storage.init();
+  get info() {
+    return {
+      ...this.#info,
+      logo: new URL(
+        `/logo/${this.#info.logo}?ver=${import.meta.env.VITE_VERSION}`,
+        this.#account.getBaseURL('swap')
+      ).toString(),
+    };
+  }
+
+  constructor({ request, account, id }) {
+    if (!request) throw new TypeError('request is required');
+    if (!account) throw new TypeError('account is required');
+    if (!id) throw new TypeError('id is required');
+    this.#id = id;
+    this.#request = request;
+    this.#account = account;
+  }
+
+  init({ storage, info }) {
+    this.#storage = storage;
+    this.#info = info;
   }
 
   async loadExchanges() {
+    try {
+      return this.#loadExchanges();
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async #loadExchanges() {
     this.#exchanges = this.#storage.get('exchanges');
     const ids = this.#exchanges
       .filter((exchange) => {
@@ -85,7 +122,7 @@ export default class ChangellyExchange {
       .map((exchange) => exchange.id);
     if (ids.length) {
       const updates = await this.#request({
-        url: '/api/v4/exchange/changelly/transactions',
+        url: `api/v1/transactions/${this.#id}`,
         method: 'get',
         params: {
           transactions: ids.join(','),
@@ -107,9 +144,9 @@ export default class ChangellyExchange {
     }
   }
 
-  async loadExchange(id) {
+  async #loadExchange(id) {
     const [update] = await this.#request({
-      url: '/api/v4/exchange/changelly/transactions',
+      url: `api/v1/transactions/${this.#id}/`,
       method: 'get',
       params: {
         transactions: id,
@@ -127,55 +164,10 @@ export default class ChangellyExchange {
     return this.#exchanges[index];
   }
 
-  async estimateExchange({ from, to, amount }) {
-    if (amount.value <= 0n) {
-      throw new errors.AmountError('Invalid amount');
-    }
-    let estimation;
-    try {
-      estimation = await this.#request({
-        url: '/api/v4/exchange/changelly/estimate',
-        method: 'get',
-        params: {
-          from,
-          to,
-          amount: amount.toString(),
-        },
-        seed: 'device',
-      });
-    } catch (err) {
-      if (err instanceof errors.NodeError) {
-        throw new InternalExchangeError('Unable to estimate', { cause: err });
-      }
-      throw err;
-    }
-    const cryptoFrom = this.#account.cryptoDB.get(from);
-    if (estimation.error) {
-      if (estimation.error === 'AmountError') {
-        throw new ExchangeAmountError('Invalid amount');
-      }
-      if (estimation.error === 'SmallAmountError') {
-        throw new ExchangeSmallAmountError(Amount.fromString(estimation.amount || '0', cryptoFrom.decimals));
-      }
-      if (estimation.error === 'BigAmountError') {
-        throw new ExchangeBigAmountError(Amount.fromString(estimation.amount || '0', cryptoFrom.decimals));
-      }
-      if (estimation.error === 'ExchangeDisabled') {
-        throw new ExchangeDisabledError();
-      }
-      throw new InternalExchangeError(estimation.error);
-    }
-    const cryptoTo = this.#account.cryptoDB.get(to);
-    return {
-      rate: Amount.fromString(estimation.rate, cryptoTo.decimals),
-      result: Amount.fromString(estimation.result, cryptoTo.decimals),
-    };
-  }
-
   async createExchange({ from, to, amount, address, extraId, refundAddress }) {
     try {
       const exchange = await this.#request({
-        url: '/api/v4/exchange/changelly/transaction',
+        url: `api/v1/transaction/${this.#id}`,
         method: 'post',
         data: {
           from,
@@ -190,7 +182,7 @@ export default class ChangellyExchange {
       return exchange;
     } catch (err) {
       if (err instanceof errors.NodeError) {
-        throw new InternalExchangeError('Unable to create exchange', { cause: err });
+        throw new InternalExchangeError('Unable to create exchange', { cause: err, provider: this.#id });
       }
       throw err;
     }
@@ -217,12 +209,12 @@ export default class ChangellyExchange {
     }
     try {
       const data = await this.#request({
-        url: '/api/v4/exchange/changelly/validate',
+        url: `api/v1/validate/${this.#id}`,
         method: 'get',
         params: {
-          crypto: to,
+          cryptoId: to,
           address: encodeURIComponent(address),
-          extra: extraId ? encodeURIComponent(extraId) : undefined,
+          extraId: extraId ? encodeURIComponent(extraId) : undefined,
         },
         seed: 'device',
       });
@@ -236,30 +228,20 @@ export default class ChangellyExchange {
     }
   }
 
-  #assignExchange(transaction, exchange) {
-    transaction.exchange = {
-      id: exchange.id,
-      trackUrl: exchange.trackUrl,
-      status: this.#mapExchangeStatus(exchange),
-      originalStatus: exchange.status,
-      to: exchange.internal === true ? 'your wallet' : exchange.payoutAddress,
-      payoutHash: exchange?.payoutHash?.toLowerCase(),
-    };
-    if (transaction.incoming) {
-      const cryptoFrom = this.#account.cryptoDB.get(exchange.cryptoFrom);
-      const amountFrom = exchange.amountFrom !== '0' ? exchange.amountFrom : exchange.amountExpectedFrom;
-      transaction.exchange.cryptoFrom = cryptoFrom;
-      transaction.exchange.amountFrom = Amount.fromString(amountFrom, cryptoFrom.decimals);
-    } else {
-      const cryptoTo = this.#account.cryptoDB.get(exchange.cryptoTo);
-      const amountTo = exchange.amountTo !== '0' ? exchange.amountTo : exchange.amountExpectedTo;
-      transaction.exchange.cryptoTo = cryptoTo;
-      transaction.exchange.amountTo = Amount.fromString(amountTo, cryptoTo.decimals);
-    }
-    return transaction;
+  exchangifyTransactions(transactions, crypto) {
+    return transactions.map((transaction) => this.#exchangifyTransaction(transaction, crypto));
   }
 
-  async exchangifyTransaction(transaction, crypto) {
+  async reexchangifyTransaction(transaction) {
+    if (['finished', 'failed', 'refunded', 'overdue', 'expired'].includes(transaction.exchange.originalStatus)) {
+      const exchange = await this.#loadExchange(transaction.exchange.id);
+      return this.#assignExchange(transaction, exchange);
+    } else {
+      return transaction;
+    }
+  }
+
+  #exchangifyTransaction(transaction, crypto) {
     const exchange = this.#exchanges
       .filter((item) => item.cryptoFrom === crypto._id || item.cryptoTo === crypto._id)
       .find((item) => {
@@ -282,43 +264,56 @@ export default class ChangellyExchange {
     return this.#assignExchange(transaction, exchange);
   }
 
-  async exchangifyTransactions(transactions, crypto) {
-    return Promise.all(transactions.map((transaction) => this.exchangifyTransaction(transaction, crypto)));
-  }
-
-  async reexchangifyTransaction(transaction) {
-    if (['finished', 'failed', 'refunded', 'overdue', 'expired'].includes(transaction.exchange.originalStatus)) {
-      const exchange = await this.loadExchange(transaction.exchange.id);
-      return this.#assignExchange(transaction, exchange);
+  #assignExchange(transaction, exchange) {
+    if (!exchange.cryptoFrom) return;
+    if (!exchange.cryptoTo) return;
+    transaction.exchange = {
+      id: exchange.id,
+      trackUrl: exchange.trackUrl,
+      status: this.#mapExchangeStatus(exchange),
+      originalStatus: exchange.status,
+      to: exchange.internal === true ? 'your wallet' : exchange.payoutAddress,
+      payoutHash: exchange?.payoutHash?.toLowerCase(),
+      providerInfo: this.info,
+    };
+    if (transaction.incoming) {
+      const cryptoFrom = this.#account.cryptoDB.get(exchange.cryptoFrom);
+      const amountFrom = exchange.amountFrom !== '0' ? exchange.amountFrom : exchange.amountExpectedFrom;
+      transaction.exchange.cryptoFrom = cryptoFrom;
+      transaction.exchange.amountFrom = Amount.fromString(amountFrom, cryptoFrom.decimals);
     } else {
-      return transaction;
+      const cryptoTo = this.#account.cryptoDB.get(exchange.cryptoTo);
+      const amountTo = exchange.amountTo !== '0' ? exchange.amountTo : exchange.amountExpectedTo;
+      transaction.exchange.cryptoTo = cryptoTo;
+      transaction.exchange.amountTo = Amount.fromString(amountTo, cryptoTo.decimals);
     }
+    return transaction;
   }
 
   #mapExchangeStatus(exchange) {
     switch (exchange.status) {
       case 'waiting':
       case 'confirming':
-        return ChangellyExchange.STATUS_PENDING;
+        return BaseExchange.STATUS_PENDING;
       case 'exchanging':
       case 'sending':
-        return ChangellyExchange.STATUS_EXCHANGING;
+        return BaseExchange.STATUS_EXCHANGING;
       case 'finished':
         if (this.#isRequiredToAccept(exchange)) {
-          return ChangellyExchange.STATUS_REQUIRED_TO_ACCEPT;
+          return BaseExchange.STATUS_REQUIRED_TO_ACCEPT;
         } else {
-          return ChangellyExchange.STATUS_SUCCESS;
+          return BaseExchange.STATUS_SUCCESS;
         }
       case 'failed':
       case 'overdue':
       case 'expired':
-        return ChangellyExchange.STATUS_FAILED;
+        return BaseExchange.STATUS_FAILED;
       case 'refunded':
-        return ChangellyExchange.STATUS_REFUNDED;
+        return BaseExchange.STATUS_REFUNDED;
       case 'hold':
-        return ChangellyExchange.STATUS_HOLD;
+        return BaseExchange.STATUS_HOLD;
       default:
-        return ChangellyExchange.STATUS_FAILED;
+        return BaseExchange.STATUS_FAILED;
     }
   }
 

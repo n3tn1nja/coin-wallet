@@ -1,5 +1,6 @@
 import appxmanifest from './support/appxmanifest.js';
 import fs from 'node:fs/promises';
+import path from 'node:path';
 import setLanguages from 'electron-packager-languages';
 const schemes = [
   'coinspace',
@@ -11,7 +12,7 @@ const pkg = JSON.parse(await fs.readFile('./package.json'));
 const { VITE_DISTRIBUTION } = process.env;
 const BRANCH = process.env.GITHUB_REF && process.env.GITHUB_REF.replace('refs/heads/', '');
 
-if (!['appx', 'appx-dev', 'mac', 'mas', 'mas-dev', 'snap'].includes(VITE_DISTRIBUTION)) {
+if (!['appx', 'appx-dev', 'mac', 'mas', 'mas-dev', 'snap', 'flatpak'].includes(VITE_DISTRIBUTION)) {
   throw new Error(`Unsupported distribution: '${VITE_DISTRIBUTION}'`);
 }
 
@@ -41,7 +42,7 @@ export default {
       /HISTORY.md/i,
       /CHANGELOG.md/i,
       '^/(?!electron.js|package.json|lib|dist|resources|node_modules)',
-      ['appx', 'appx-dev', 'snap'].includes(VITE_DISTRIBUTION) ? '^/resources/(?!64x64.png)' : '^/resources',
+      ['appx', 'appx-dev', 'snap', 'flatpak'].includes(VITE_DISTRIBUTION) ? '^/resources/(?!64x64.png)' : '^/resources',
       'Makefile',
       '.editorconfig',
       '.gitignore',
@@ -60,6 +61,13 @@ export default {
     ],
     appBundleId: 'com.coinspace.wallet',
     appCategoryType: 'public.app-category.finance',
+    extendInfo: {
+      LSMinimumSystemVersion: '11.0',
+      NSCameraUsageDescription: 'This app uses the camera to scan QR codes.',
+      ...(['mas', 'mas-dev'].includes(VITE_DISTRIBUTION) ? {} : {
+        NSLocationUsageDescription: 'Turn on location services to send or receive coins with people around you.',
+      }),
+    },
     osxSign: {
       type: VITE_DISTRIBUTION === 'mas-dev' ? 'development' : 'distribution',
       provisioningProfile: ['mas', 'mas-dev'].includes(VITE_DISTRIBUTION) ? 'embedded.provisionprofile' : undefined,
@@ -197,7 +205,7 @@ export default {
         name: `${pkg.productName}-${pkg.version}${VITE_DISTRIBUTION === 'mas-dev' ? '-dev': ''}`,
       },
     },
-    {
+    VITE_DISTRIBUTION === 'snap' && {
       name: './support/snap.cjs',
       config: {
         linux: {
@@ -218,9 +226,58 @@ export default {
         publish: BRANCH === 'master' ? 'always' : 'never',
       },
     },
+    VITE_DISTRIBUTION === 'flatpak' && {
+      name: '@electron-forge/maker-flatpak',
+      config: {
+        options: {
+          id: 'space.coin.wallet',
+          bin: pkg.executableName,
+          productName: pkg.productName,
+          genericName: 'Wallet',
+          description: pkg.description,
+          categories: ['Office', 'Finance'],
+          icon: {
+            scalable: 'resources/icon.svg',
+          },
+          runtimeVersion: '24.08',
+          // Available versions: https://github.com/flathub/org.electronjs.Electron2.BaseApp/
+          baseVersion: '24.08',
+          modules: [{
+            name: 'zypak',
+            sources: [{
+              type: 'git',
+              url: 'https://github.com/refi64/zypak',
+              tag: 'v2024.01.17',
+            }],
+          }],
+          finishArgs: [
+            // X Rendering
+            '--socket=x11', '--socket=wayland', '--share=ipc',
+            // OpenGL
+            '--device=dri',
+            // Audio output
+            '--socket=pulseaudio',
+            // Read/write home directory access
+            '--filesystem=home',
+            // Chromium uses a socket in tmp for its singleton check
+            '--env=TMPDIR=/var/tmp',
+            // Allow communication with network
+            '--share=network',
+            // System notifications with libnotify
+            '--talk-name=org.freedesktop.Notifications',
+            // USB and webcam
+            '--device=all',
+          ],
+          mimeType: schemes.map((scheme) => `x-scheme-handler/${scheme}`),
+        },
+        rename(dest/*, src*/) {
+          return path.join(dest, `${pkg.productName}.flatpak`);
+        },
+      },
+    },
   ].filter(item => !!item),
   publishers: [
-    ['mac'].includes(VITE_DISTRIBUTION) && BRANCH === 'master' && {
+    ['mac', 'flatpak'].includes(VITE_DISTRIBUTION) && BRANCH === 'master' && {
       name: '@electron-forge/publisher-github',
       config: {
         repository: {
@@ -236,7 +293,8 @@ export default {
       config: {
         bucket: process.env.GOOGLE_CLOUD_BUCKET,
         keyResolver(fileName/*, platform, arch*/) {
-          return `${pkg.version}-${BRANCH || 'local'}/${fileName}`;
+          const dir = `${pkg.version}-${BRANCH || 'local'}`;
+          return `${dir}/${fileName}`;
         },
         public: false,
       },

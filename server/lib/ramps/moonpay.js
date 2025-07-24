@@ -1,7 +1,6 @@
-import ExpiryMap from 'expiry-map';
 import axios from 'axios';
 import crypto from 'crypto';
-import pMemoize from 'p-memoize';
+import { dbMemoize } from '../db.js';
 
 const rampData = {
   id: 'moonpay',
@@ -15,7 +14,7 @@ const rampApi = axios.create({
 });
 const colorCode = '#3cc77a';
 
-async function buy(countryCode, crypto, walletAddress) {
+async function buy({ countryCode, crypto, address }) {
   const result = await getCountryAndCurrency(countryCode, crypto);
   if (!result) return;
   const { country, currency } = result;
@@ -23,7 +22,7 @@ async function buy(countryCode, crypto, walletAddress) {
     const params = new URLSearchParams({
       apiKey: process.env.MOONPAY_API_KEY,
       currencyCode: currency.code,
-      walletAddress,
+      walletAddress: address,
       colorCode,
       enableRecurringBuys: true,
     });
@@ -34,7 +33,7 @@ async function buy(countryCode, crypto, walletAddress) {
   }
 }
 
-async function sell(countryCode, crypto, walletAddress) {
+async function sell({ countryCode, crypto, address }) {
   const result = await getCountryAndCurrency(countryCode, crypto);
   if (!result) return;
   const { country, currency } = result;
@@ -42,7 +41,7 @@ async function sell(countryCode, crypto, walletAddress) {
     const params = new URLSearchParams({
       apiKey: process.env.MOONPAY_API_KEY,
       baseCurrencyCode: currency.code,
-      refundWalletAddress: walletAddress,
+      refundWalletAddress: address,
       colorCode,
     });
     return {
@@ -53,7 +52,7 @@ async function sell(countryCode, crypto, walletAddress) {
 }
 
 async function getCountryAndCurrency(countryCode, crypto) {
-  if (!crypto) return;
+  if (!crypto?.moonpay) return;
   const countries = await cachedCountries();
   const country = countryCode ? countries.find((item) => item.alpha2 === countryCode) : {
     isBuyAllowed: true,
@@ -62,25 +61,22 @@ async function getCountryAndCurrency(countryCode, crypto) {
   if (!country) return;
 
   const currencies = await cachedCurrencies();
-  let currency;
-  if (crypto.moonpay) {
-    currency = currencies.find((item) => item.id === crypto.moonpay.id);
-  }
+  const currency = currencies.find((item) => item.id === crypto.moonpay.id);
   if (!currency) return;
   if (currency.isSuspended) return;
-  if (country.alpha2 === 'US' && !currency.isSupportedInUS) return;
+  if (currency.notAllowedCountries && currency.notAllowedCountries.includes(country.alpha2)) return;
   return { country, currency };
 }
 
-const cachedCurrencies = pMemoize(async () => {
+const cachedCurrencies = dbMemoize(async () => {
   const { data } = await rampApi.get('/v3/currencies');
   return data;
-}, { cache: new ExpiryMap(1 * 60 * 60 * 1000) }); // 1 hour
+}, { key: 'moonpay-currencies', ttl: 1 * 60 * 60 }); // 1 hour
 
-const cachedCountries = pMemoize(async () => {
+const cachedCountries = dbMemoize(async () => {
   const { data } = await rampApi.get('/v3/countries');
   return data;
-}, { cache: new ExpiryMap(1 * 60 * 60 * 1000) }); // 1 hour
+}, { key: 'moonpay-countries', ttl: 1 * 60 * 60 }); // 1 hour
 
 function signUrl(url) {
   const signature = crypto

@@ -134,24 +134,28 @@ export default {
       height: $spacing-8xl;
       align-self: center;
       border-radius: 50%;
+      animation: status-icon 0.2s ease-in 0.1s forwards;
+      opacity: 0;
+      transform: scale(0.3);
+
+      path {
+        stroke-dasharray: 100;
+        stroke-dashoffset: 100;
+      }
 
       &--success {
         background-color: $primary-light;
 
-        svg {
-          * {
-            stroke: $primary;
-          }
+        path {
+          animation: status-success-path 0.3s ease-in 0.15s forwards;
         }
       }
 
       &--failed {
         background-color: $danger-light;
 
-        svg {
-          * {
-            stroke: $danger;
-          }
+        path {
+          animation: status-failed-path 0.3s ease-in 0.15s forwards;
         }
       }
     }

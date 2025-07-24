@@ -19,27 +19,26 @@ export default {
       type: Number,
       default: 0,
     },
-    marketState: {
-      type: Symbol,
+    chartPoint: {
+      type: Object,
       default: undefined,
     },
   },
   computed: {
     fiat() {
-      if (this.marketState === this.$STATE_LOADING) return '...';
-      if (this.marketState === this.$STATE_ERROR) return '⚠️';
-      return this.$c(this.price);
+      const price = this.chartPoint ? this.chartPoint.price : this.price;
+      if (!price) return '';
+      return this.$c(price);
     },
     changePercent() {
-      if (this.marketState === this.$STATE_LOADING) return '...';
-      if (this.marketState === this.$STATE_ERROR) return '⚠️';
+      if (!this.change) return '';
       return this.$n(this.change, 'percent');
     },
     positive() {
-      return this.marketState === this.$STATE_LOADED && this.change > 0;
+      return this.change > 0;
     },
     negative() {
-      return this.marketState === this.$STATE_LOADED && this.change < 0;
+      return this.change < 0;
     },
   },
 };
@@ -52,10 +51,7 @@ export default {
       :crypto="$wallet.crypto"
       :platform="$wallet.platform"
     />
-    <div
-      v-if="$wallet.crypto.coingecko"
-      class="&__price-info"
-    >
+    <div v-if="$wallet.crypto.coingecko">
       <div
         class="&__price"
         :title="fiat"
@@ -63,6 +59,13 @@ export default {
         {{ fiat }}
       </div>
       <div
+        v-if="chartPoint"
+        class="&__timestamp"
+      >
+        {{ chartPoint.timestamp }}
+      </div>
+      <div
+        v-else
         class="&__change"
         :class="{
           '&__change--positive': positive,
@@ -86,18 +89,22 @@ export default {
 <style lang="scss">
   .#{ $filename } {
     display: flex;
-    flex-basis: 50%;
+    flex-basis: 100%;
     gap: $spacing-md;
+
+    @include breakpoint(md) {
+      flex-basis: auto;
+    }
 
     &__crypto-logo {
       width: $spacing-3xl;
       height: $spacing-3xl;
+      flex-shrink: 0;
     }
 
     &__price {
       @include text-md;
       @include text-bold;
-      @include ellipsis;
     }
 
     &__change {
@@ -113,11 +120,21 @@ export default {
       &--negative {
         color: $danger;
       }
+
+      &::after {
+        content: ".";
+        visibility: hidden;
+      }
     }
 
     &__change_arrow {
       width: $spacing-sm;
       height: $spacing-sm;
+    }
+
+    &__timestamp {
+      @include text-sm;
+      color: $secondary;
     }
   }
 </style>

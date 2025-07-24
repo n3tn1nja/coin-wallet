@@ -10,6 +10,9 @@ html {
   letter-spacing: 0.01em;
   line-height: 1.5;
   text-size-adjust: none; // Prevent adjustments of font size after orientation changes in iOS.
+  &.platform--ios {
+    min-height: 100vh; // fix ios overlay bug
+  }
 }
 
 body {
@@ -34,6 +37,13 @@ body {
   box-sizing: inherit;
   outline: none;
   -webkit-tap-highlight-color: rgb(0 0 0 / 0%);
+}
+
+* {
+  scrollbar-width: thin;
+  @include breakpoint(lg) {
+    scrollbar-width: auto;
+  }
 }
 
 button,

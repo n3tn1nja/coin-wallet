@@ -81,11 +81,14 @@ export default {
         class="&__content"
         :class="{ '&__content--narrow': !wide }"
       >
-        <template v-if="'$wallet' in this && $wallet">
+        <template v-if="$wallet">
           <CsLoader v-if="$walletState === $STATE_LOADING" />
           <slot v-if="[$STATE_LOADED, $STATE_NEED_ACTIVATION].includes($walletState)" />
-          <div v-if="$walletState === $STATE_ERROR">
-            {{ $t('Error! Please try again later.') }}
+          <div
+            v-if="$walletState === $STATE_ERROR"
+            class="&__error"
+          >
+            {{ $account.unknownError() }}
           </div>
         </template>
         <slot v-else />
@@ -107,6 +110,7 @@ export default {
       flex-direction: column;
       align-items: center;
       overflow-y: auto;
+      scrollbar-width: thin;
     }
 
     &__content {
@@ -137,6 +141,10 @@ export default {
       @include breakpoint(lg) {
         border-bottom: 1px solid $divider;
       }
+    }
+
+    &__error {
+      @include text-md;
     }
   }
 </style>

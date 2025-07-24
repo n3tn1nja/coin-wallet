@@ -42,6 +42,8 @@ export default {
 <template>
   <CsNavbarButton
     class="&"
+    :title="$t('Refresh')"
+    :aria-label="$t('Refresh')"
     @click="click"
   >
     <RefreshIcon
@@ -60,7 +62,7 @@ export default {
       display: flex;
     }
 
-    @media (any-hover: hover) {
+    @media (pointer: fine) {
       display: flex;
     }
 

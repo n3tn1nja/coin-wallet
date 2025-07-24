@@ -1,4 +1,5 @@
 import ExpiryMap from 'expiry-map';
+import { chunks } from '../helpers.js';
 import pMemoize from 'p-memoize';
 
 const periodToDays = {
@@ -12,12 +13,12 @@ const periodToDays = {
 export default class PriceAPI {
   #request;
 
-  constructor({ request }) {
+  constructor({ request, account }) {
     this.#request = pMemoize(async (config) => {
       return await request({
         seed: 'device',
         ...config,
-        baseURL: import.meta.env.VITE_PRICE_API_URL + 'api/v1/',
+        baseURL: account.getBaseURL('price'),
       });
     }, {
       cache: new ExpiryMap(1 * 60 * 1000),
@@ -28,18 +29,21 @@ export default class PriceAPI {
   }
 
   async market(ids, currency) {
-    return await this.#request({
-      url: 'prices',
-      params: {
-        cryptoIds: ids.join(),
-        fiat: currency,
-      },
-    });
+    if (ids.length === 0) return [];
+    return (await Promise.all(chunks(ids, 50).map((chunk) => {
+      return this.#request({
+        url: 'api/v1/prices',
+        params: {
+          cryptoIds: chunk.join(),
+          fiat: currency,
+        },
+      });
+    }))).flat();
   }
 
   async chart(id, period, currency) {
     return await this.#request({
-      url: `chart/${id}`,
+      url: `api/v1/chart/${id}`,
       params: {
         fiat: currency,
         days: periodToDays[period],

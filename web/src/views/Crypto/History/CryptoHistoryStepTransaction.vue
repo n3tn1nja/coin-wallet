@@ -2,7 +2,7 @@
 import * as MoneroSymbols from '@coinspace/cs-monero-wallet/symbols';
 import { Transaction, errors } from '@coinspace/cs-common';
 
-import ChangellyExchange from '../../../lib/account/ChangellyExchange.js';
+import BaseExchange from '../../../lib/exchanges/BaseExchange.js';
 import { cryptoToFiat } from '../../../lib/helpers.js';
 import { onShowOnHide } from '../../../lib/mixins.js';
 
@@ -33,7 +33,7 @@ export default {
   async onShow() {
     if (this.transaction.exchange) {
       try {
-        this.transaction = await this.$account.exchange.reexchangifyTransaction(this.transaction);
+        this.transaction = await this.$account.exchanges.reexchangifyTransaction(this.transaction);
       } catch (err) {
         console.error(err);
       }
@@ -80,18 +80,22 @@ export default {
       if (!this.transaction.exchange) return;
       const { status } = this.transaction.exchange;
       let text;
-      if (status === ChangellyExchange.STATUS_PENDING) {
+      if (status === BaseExchange.STATUS_PENDING) {
         text = this.$t('Awaiting transaction confirmation.');
-      } else if (status === ChangellyExchange.STATUS_EXCHANGING) {
-        text = this.$t('Deposit has been received. Awaiting exchange.');
-      } else if (status === ChangellyExchange.STATUS_REQUIRED_TO_ACCEPT) {
+      } else if (status === BaseExchange.STATUS_EXCHANGING) {
+        text = this.$t('Deposit has been received. Awaiting swap.');
+      } else if (status === BaseExchange.STATUS_REQUIRED_TO_ACCEPT) {
         text = this.$t('Please accept transaction to receive funds.');
-      } else if (status === ChangellyExchange.STATUS_HOLD) {
-        text = this.$t('Please contact Changelly to pass KYC.');
-      } else if (status === ChangellyExchange.STATUS_REFUNDED) {
-        text = this.$t('Exchange failed and funds were refunded to your wallet.');
-      } else if (status === ChangellyExchange.STATUS_FAILED) {
-        text = this.$t('Exchange failed. Please contact Changelly.');
+      } else if (status === BaseExchange.STATUS_HOLD) {
+        text = this.$t('Please contact {exchange} to pass KYC.', {
+          exchange: this.transaction.exchange.providerInfo.name,
+        });
+      } else if (status === BaseExchange.STATUS_REFUNDED) {
+        text = this.$t('Swap failed and funds were refunded to your wallet.');
+      } else if (status === BaseExchange.STATUS_FAILED) {
+        text = this.$t('Swap failed. Please contact {exchange}.', {
+          exchange: this.transaction.exchange.providerInfo.name,
+        });
       }
       return {
         amount: this.transaction.incoming ?
@@ -99,11 +103,11 @@ export default {
           `${this.transaction.exchange.amountTo} ${this.transaction.exchange.cryptoTo.symbol}`,
         status: text,
         isStatusDanger: [
-          ChangellyExchange.STATUS_FAILED,
-          ChangellyExchange.STATUS_REFUNDED,
-          ChangellyExchange.STATUS_HOLD,
+          BaseExchange.STATUS_FAILED,
+          BaseExchange.STATUS_REFUNDED,
+          BaseExchange.STATUS_HOLD,
         ].includes(status),
-        hasAcceptButton: status === ChangellyExchange.STATUS_REQUIRED_TO_ACCEPT,
+        hasAcceptButton: status === BaseExchange.STATUS_REQUIRED_TO_ACCEPT,
       };
     },
   },
@@ -112,7 +116,8 @@ export default {
       this.isLoading = true;
       try {
         const replacement = await this.$wallet.estimateReplacement(this.transaction);
-        this.updateStorage({ replacement, transaction: this.transaction });
+        const pricePlatform = await this.$account.market.getPrice(this.$wallet.platform._id, this.$currency);
+        this.updateStorage({ replacement, pricePlatform, transaction: this.transaction });
         this.next('accelerate');
       } catch (err) {
         if (err instanceof errors.BigAmountError) {
@@ -217,7 +222,7 @@ export default {
         :label="$t('Fee')"
         :value="`${transaction.fee} ${$wallet.crypto.type === 'coin'
           ? $wallet.crypto.symbol : $wallet.platform.symbol}`
-          + `${$wallet.platform._id === 'ethereum@optimism' ? ' + L1' : ''}`"
+          + `${['ethereum@optimism', 'ethereum@base'].includes($wallet.platform._id) ? ' + L1' : ''}`"
       />
       <CsFormTextareaReadonly
         :label="$t('Transaction ID')"
@@ -232,13 +237,15 @@ export default {
     </CsFormGroup>
     <CsButtonGroup>
       <template v-if="exchange">
-        <CsPoweredBy powered="changelly" />
         <CsButton
           type="primary-light"
           @click="$safeOpen(transaction.exchange.trackUrl)"
         >
-          {{ $t('Contact Changelly') }}
+          {{ $t('Contact {exchange}', {
+            exchange: transaction.exchange.providerInfo.name,
+          }) }}
         </CsButton>
+        <CsPoweredBy :powered="transaction.exchange.providerInfo" />
       </template>
       <CsButton
         v-else-if="transaction.rbf"

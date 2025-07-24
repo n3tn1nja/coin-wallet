@@ -1,9 +1,11 @@
 <script>
 import CsCryptoLogo from './CsCryptoLogo.vue';
+import TickIcon from '../assets/svg/tick.svg';
 
 export default {
   components: {
     CsCryptoLogo,
+    TickIcon,
   },
   props: {
     header: {
@@ -15,8 +17,12 @@ export default {
       required: true,
     },
     selected: {
-      type: String,
+      type: [String, Set],
       default: '',
+    },
+    multiple: {
+      type: Boolean,
+      default: false,
     },
     isLoading: {
       type: Boolean,
@@ -35,6 +41,15 @@ export default {
   data() {
     return {};
   },
+  methods: {
+    isSelected(id) {
+      if (this.multiple) {
+        return this.selected.has(id);
+      } else {
+        return this.selected === id;
+      }
+    },
+  },
 };
 </script>
 
@@ -49,18 +64,18 @@ export default {
     >
       {{ header }}
     </div>
-    <div
+    <ul
       class="&__list"
       :class="{
         '&__list--loading': isLoading,
       }"
     >
-      <div
+      <li
         v-for="item in items"
         :key="item.crypto._id"
         class="&__item"
         :class="{
-          '&__item--selected': selected === item.crypto._id,
+          '&__item--selected': isSelected(item.crypto._id),
           '&__item--columns': columns === true,
         }"
         @click="!isLoading && $emit('select', item.crypto._id)"
@@ -107,6 +122,7 @@ export default {
               {{ $c(item.market.price) }}
             </span>
             <span
+              v-if="item.market.change[changePeriod]"
               class="&__change"
               :class="{
                 '&__change--positive': item.market.change[changePeriod] > 0,
@@ -117,8 +133,14 @@ export default {
             </span>
           </div>
         </div>
-      </div>
-    </div>
+        <div
+          v-if="multiple && isSelected(item.crypto._id)"
+          class="&__multiple"
+        >
+          <TickIcon class="&__tick" />
+        </div>
+      </li>
+    </ul>
   </div>
 </template>
 
@@ -134,8 +156,10 @@ export default {
       display: flex;
       flex-wrap: wrap;
       justify-content: flex-start;
-      margin-right: -$spacing-sm;
-      margin-left: -$spacing-sm;
+      padding: 0;
+      margin: 0 (-$spacing-sm);
+      gap: $spacing-2xs;
+      list-style: none;
 
       &--loading {
         opacity: 0.4;
@@ -168,10 +192,10 @@ export default {
 
       &--columns {
         @include breakpoint(lg) {
-          flex-basis: 50%;
+          flex-basis: calc((100% - $spacing-2xs) / 2);
         }
         @include breakpoint(xl) {
-          flex-basis: calc(100% / 3);
+          flex-basis: calc((100% - 2 * $spacing-2xs) / 3);
         }
       }
     }
@@ -245,6 +269,15 @@ export default {
       &--negative {
         color: $danger;
       }
+    }
+
+    &__multiple {
+      align-self: center;
+    }
+
+    &__tick {
+      width: $spacing-xl;
+      height: $spacing-xl;
     }
   }
 </style>

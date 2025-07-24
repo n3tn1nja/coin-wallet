@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { randomBytes } from 'crypto';
+import { getUserId } from '../utils.js';
 
 const API_KEY = process.env.PAYBIS_API_KEY;
 const rampData = {
@@ -23,22 +23,30 @@ const rampApi = axios.create({
   },
 });
 
-async function buy(_, crypto, walletAddress) {
+async function ramp(type, { walletId, crypto, address }) {
   if (!API_KEY) return;
   if (!crypto?.paybis?.id) return;
+  if (type === 'sell' && crypto.paybis.sell !== true) return;
+
+  const params = {
+    partnerUserId: getUserId(walletId, 'Paybis'),
+    locale: 'en',
+  };
+
+  if (type === 'buy') {
+    params.flow = 'buyCrypto';
+    params.cryptoWalletAddress = {
+      currencyCode: crypto.paybis.id,
+      address,
+    };
+  } else {
+    params.flow = 'sellCrypto';
+  }
 
   const { data } = await rampApi({
     url: '/v2/request',
     method: 'post',
-    data: {
-      cryptoWalletAddress: {
-        currencyCode: crypto.paybis.id,
-        address: walletAddress,
-      },
-      partnerUserId: randomBytes(32).toString('hex'),
-      flow: 'buyCrypto',
-      locale: 'en',
-    },
+    data: params,
   });
 
   const url = new URL(widgetURL);
@@ -49,7 +57,13 @@ async function buy(_, crypto, walletAddress) {
   };
 }
 
-async function sell() {}
+async function buy({ walletId, crypto, address }) {
+  return ramp('buy', { walletId, crypto, address });
+}
+
+async function sell({ walletId, crypto }) {
+  return ramp('sell', { walletId, crypto });
+}
 
 export default {
   buy,

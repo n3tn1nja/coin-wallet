@@ -1,12 +1,14 @@
 <script>
+import { CsWallet } from '@coinspace/cs-common';
+
 import CsStep from '../../../components/CsStep.vue';
 import CsTransactionConfirm from '../../../components/CsTransactionConfirm.vue';
 import MainLayout from '../../../layouts/MainLayout.vue';
 
 import { walletSeed } from '../../../lib/mixins.js';
-import ChangellyExchange, {
+import BaseExchange, {
   InternalExchangeError,
-} from '../../../lib/account/ChangellyExchange.js';
+} from '../../../lib/exchanges/BaseExchange.js';
 
 import * as EOSErrors from '@coinspace/cs-eos-wallet/errors';
 
@@ -27,7 +29,8 @@ export default {
       this.isLoading = true;
       await this.walletSeed(async (walletSeed) => {
         try {
-          const exchange = await this.$account.exchange.createExchange({
+          const exchange = await this.$account.exchanges.createExchange({
+            provider: this.storage.provider,
             from: this.$wallet.crypto._id,
             to: this.storage.to.crypto._id,
             amount: this.storage.amount,
@@ -35,7 +38,7 @@ export default {
               ? this.$account.wallet(this.storage.to.crypto._id).address
               : this.storage.address,
             extraId: (this.storage.address !== 'your wallet'
-              && ChangellyExchange.EXTRA_ID.includes(this.storage.to.crypto._id))
+              && BaseExchange.EXTRA_ID.includes(this.storage.to.crypto._id))
               ? this.storage.extraId : undefined,
             refundAddress: this.$wallet.address,
           });
@@ -50,7 +53,7 @@ export default {
             price: this.storage.priceUSD,
           };
           if (this.$wallet.isFeeRatesSupported) {
-            options.feeRate = this.$wallet.feeRates[0];
+            options.feeRate = CsWallet.FEE_RATE_DEFAULT;
           }
           if (this.$wallet.isGasLimitSupported) {
             options.gasLimit = this.$wallet.gasLimit;
@@ -67,7 +70,8 @@ export default {
           const id = await this.$wallet.createTransaction(options, walletSeed);
           this.$account.emit('update');
           this.updateStorage({ status: true });
-          await this.$account.exchange.saveExchange({
+          await this.$account.exchanges.saveExchange({
+            provider: this.storage.provider,
             from: this.$wallet.crypto._id,
             to: this.storage.to.crypto._id,
             transactionId: id,
@@ -76,7 +80,9 @@ export default {
           });
         } catch (err) {
           if (err instanceof InternalExchangeError) {
-            this.updateStorage({ status: false, message: this.$t('Changelly error. Please try again later.') });
+            this.updateStorage({ status: false, message: this.$t('{exchange} error. Please try again later.', {
+              exchange: this.$account.exchanges.getProviderInfo(this.storage.provider).name,
+            }) });
             return;
           }
           if (err instanceof EOSErrors.DestinationAccountError) {
@@ -116,10 +122,10 @@ export default {
 </script>
 
 <template>
-  <MainLayout :title="$t('Confirm exchange')">
+  <MainLayout :title="$t('Confirm swap')">
     <CsTransactionConfirm
       :transaction="storage"
-      powered="changelly"
+      :powered="$account.exchanges.getProviderInfo(storage.provider)"
       :isLoading="isLoading"
       @confirm="confirm"
     />

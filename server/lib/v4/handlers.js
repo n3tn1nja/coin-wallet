@@ -1,10 +1,10 @@
 import createError from 'http-errors';
 import semver from 'semver';
 
-import changelly from '../changelly.js';
 import cryptos from '../cryptos.js';
 import csFee from '../csFee.js';
 import domain from '../domain.js';
+import exchanges from '../exchanges/index.js';
 import fee from '../fee.js';
 import github from '../github.js';
 import mecto from '../mecto.js';
@@ -83,6 +83,12 @@ export async function getStorage(req, res) {
   const device = await req.getDevice();
   const data = await storage.getStorage(device, req.params.storageName);
   res.status(200).send({ data });
+}
+
+export async function getStorages(req, res) {
+  const device = await req.getDevice();
+  const data = await storage.getStorages(device, req.params.storageNames);
+  res.status(200).send(data);
 }
 
 export async function setStorage(req, res) {
@@ -257,12 +263,14 @@ export async function removeMecto(req, res) {
 }
 
 export async function getRampsBuy(req, res) {
-  const data = await ramps.buy(req.query);
+  const device = await req.getDevice();
+  const data = await ramps.buy(device.wallet._id, req.query);
   res.status(200).send(data);
 }
 
 export async function getRampsSell(req, res) {
-  const data = await ramps.sell(req.query);
+  const device = await req.getDevice();
+  const data = await ramps.sell(device.wallet._id, req.query);
   res.status(200).send(data);
 }
 
@@ -287,30 +295,46 @@ export async function getUpdate(req, res) {
   }
 }
 
-export async function changellyEstimate(req, res) {
-  const data = await changelly.estimateV4(req.query.from, req.query.to, req.query.amount);
+export async function exchangeEstimate(req, res) {
+  if (!exchanges[req.params.exchangeName]) throw createError(400, 'Unknown exchange');
+  const data = await exchanges[req.params.exchangeName].estimate({
+    from: req.query.from,
+    to: req.query.to,
+    amount: req.query.amount,
+  });
   res.status(200).send(data);
 }
 
-export async function changellyValidateAddress(req, res) {
-  const data = await changelly.validateAddress(req.query.address, req.query.crypto, req.query.extra);
+export async function exchangeValidateAddress(req, res) {
+  if (!exchanges[req.params.exchangeName]) throw createError(400, 'Unknown exchange');
+  const data = await exchanges[req.params.exchangeName].validateAddress({
+    cryptoId: req.query.crypto,
+    address: req.query.address,
+    extraId: req.query.extra,
+  });
   res.status(200).send(data);
 }
 
-export async function changellyCreateTransaction(req, res) {
-  const data = await changelly.createTransaction(
-    req.body.from,
-    req.body.to,
-    req.body.amount,
-    req.body.address,
-    req.body.refundAddress,
-    req.body.extraId
-  );
+export async function exchangeCreateTransaction(req, res) {
+  if (!exchanges[req.params.exchangeName]) throw createError(400, 'Unknown exchange');
+  const device = await req.getDevice();
+  const data = await exchanges[req.params.exchangeName].createTransaction({
+    walletId: device.wallet._id,
+    from: req.body.from,
+    to: req.body.to,
+    amount: req.body.amount,
+    address: req.body.address,
+    extraId: req.body.extraId,
+    refundAddress: req.body.refundAddress,
+  });
   res.status(200).send(data);
 }
 
-export async function changellyGetTransactions(req, res) {
-  const data = await changelly.getTransactionsV4(req.query.transactions);
+export async function exchangeGetTransactions(req, res) {
+  if (!exchanges[req.params.exchangeName]) throw createError(400, 'Unknown exchange');
+  const data = await exchanges[req.params.exchangeName].getTransactions({
+    ids: req.query.transactions,
+  });
   res.status(200).send(data);
 }
 
@@ -318,4 +342,8 @@ export async function getDomainAddress(req, res) {
   const address = await domain.getAddress(req.query.domain, req.query.crypto);
   if (!address) throw createError(404, 'Address not found');
   res.status(200).send({ address });
+}
+
+export async function getCountry(req, res) {
+  res.status(200).send({ country: req.get('x-client-country') || 'ZZ' });
 }

@@ -61,14 +61,14 @@ export default {
       this.historyState = this.$STATE_LOADING;
       try {
         if (this.cursor === undefined) {
-          await this.$account.exchange.loadExchanges();
+          await this.$account.exchanges.loadExchanges();
         }
         const data = await this.$wallet.loadTransactions({ cursor: this.cursor });
         this.cursor = data.cursor;
         this.hasMore = data.hasMore;
         if (data.transactions && data.transactions.length) {
           this.transactions.push(
-            ...(await this.$account.exchange.exchangifyTransactions(data.transactions, this.$wallet.crypto))
+            ...this.$account.exchanges.exchangifyTransactions(data.transactions, this.$wallet.crypto)
           );
         }
         this.historyState = this.$STATE_LOADED;
@@ -95,6 +95,8 @@ export default {
       >
         <template #left>
           <CsNavbarButton
+            :title="$t('Back')"
+            :aria-label="$t('Back')"
             @click="back"
           >
             <ArrowLeftIcon />
@@ -113,7 +115,7 @@ export default {
         v-if="$walletState === $STATE_ERROR"
         class="&__error"
       >
-        {{ $t('Error! Please try again later.') }}
+        {{ $account.unknownError() }}
       </div>
 
       <div
@@ -141,7 +143,7 @@ export default {
         v-if="historyState === $STATE_ERROR"
         class="&__error"
       >
-        {{ $t('Error! Please try again later.') }}
+        {{ $account.unknownError() }}
       </div>
 
       <CsLoader
@@ -163,8 +165,11 @@ export default {
     }
 
     &__transactions {
+      display: flex;
+      flex-direction: column;
       margin-right: -$spacing-sm;
       margin-left: -$spacing-sm;
+      gap: $spacing-2xs;
     }
   }
 </style>

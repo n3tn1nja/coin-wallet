@@ -8,6 +8,7 @@ import FaceIdIcon from '../../assets/svg/faceId.svg';
 import TouchIdIcon from '../../assets/svg/touchId.svg';
 
 import { TYPES } from '../../lib/account/Biometry.js';
+import { redirectToApp } from '../../lib/mixins.js';
 
 export default {
   components: {
@@ -18,6 +19,7 @@ export default {
     FaceIdIcon,
   },
   extends: CsStep,
+  mixins: [redirectToApp],
   data() {
     const { type } = this.$account.biometry;
     const { $t } = this;
@@ -57,13 +59,14 @@ export default {
     async setup() {
       const result = await this.$account.biometry.enable(this.storage.pin, this.storage.seed);
       if (!result) return;
-      this.redirect();
+      this.done();
     },
-    skip() {
-      this.redirect();
-    },
-    redirect() {
-      this.$router.replace({ name: 'home' });
+    done() {
+      if (this.$account.cryptosToSelect) {
+        this.next('selectCryptos');
+      } else {
+        this.redirectToApp();
+      }
     },
   },
 };
@@ -72,7 +75,7 @@ export default {
 <template>
   <AuthStepLayout
     :title="title"
-    @back="skip"
+    @back="done"
   >
     <div class="&__icon-wrapper">
       <component
@@ -92,7 +95,7 @@ export default {
       </CsButton>
       <CsButton
         type="primary-link"
-        @click="skip"
+        @click="done"
       >
         {{ $t('Skip') }}
       </CsButton>

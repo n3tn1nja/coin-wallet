@@ -33,7 +33,7 @@ async function sync() {
       $set: {
         ...crypto,
         platformName: getPlatformName(crypto),
-        supported: crypto.supported !== false,
+        supported: typeof crypto.supported === 'string' ? false : crypto.supported !== false,
         deprecated: crypto.deprecated === true,
         synchronized_at: new Date(),
       },
@@ -241,12 +241,16 @@ async function getAllV4(limit = 0) {
     .find({}, {
       limit,
       sort: {
+        deprecated: 1,
         rank: 1,
+        original: -1,
+        _id: 1,
       },
       projection: {
         synchronized_at: false,
         updated_at: false,
         prices: false,
+        change: false,
       },
     })
     .toArray();

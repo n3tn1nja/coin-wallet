@@ -33,6 +33,17 @@ app.use('/api/v4', apiV4);
 app.set('views', './views');
 app.set('view engine', 'ejs');
 
+if (process.env.IS_TOR !== 'true') {
+  app.get('/.well-known/webauthn', (req, res) => {
+    return res.json({
+      origins: [
+        new URL(process.env.SITE_URL).origin,
+        new URL(process.env.SITE_URL_TOR).origin,
+      ],
+    });
+  });
+}
+
 app.get('*', (req, res, next) => {
   if (isAssetsPath(req.path)) return next();
   res.sendFile('index.html', { root: './dist/' });

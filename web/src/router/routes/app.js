@@ -16,18 +16,22 @@ import CryptoImportView from '../../views/Crypto/Import/CryptoImportView.vue';
 import CryptoIndexView from '../../views/Crypto/Index/CryptoIndexView.vue';
 import CryptoReceiveView from '../../views/Crypto/Receive/CryptoReceiveView.vue';
 import CryptoSendView from '../../views/Crypto/Send/CryptoSendView.vue';
+import CryptoStakingView from '../../views/Crypto/Staking/CryptoStakingView.vue';
 
 import SettingsAccountView from '../../views/Settings/Account/SettingsAccountView.vue';
 import SettingsHardwareView from '../../views/Settings/Hardware/SettingsHardwareView.vue';
 import SettingsPinView from '../../views/Settings/Pin/SettingsPinView.vue';
+import SettingsTorView from '../../views/Settings/Tor/SettingsTorView.vue';
 import SettingsView from '../../views/Settings/SettingsView.vue';
 import SettingsWalletConnectView from '../../views/Settings/WalletConnect/WalletConnectView.vue';
 
 import NotFound from '../../views/NotFound.vue';
 
-import ChangellyExchange from '../../lib/account/ChangellyExchange.js';
+import BaseExchange from '../../lib/exchanges/BaseExchange.js';
 import { parseCryptoURI } from '../../lib/cryptoURI.js';
 import schemes from '../../lib/schemes.js';
+
+const CRYPTO_ID = ':cryptoId([A-Za-z0-9-_:]+@[a-z0-9-]+)';
 
 const app = [
   {
@@ -56,16 +60,20 @@ const app = [
         name: 'settings.pin',
         component: SettingsPinView,
       }, {
+        path: 'tor',
+        name: 'settings.tor',
+        component: SettingsTorView,
+      }, {
         path: 'walletconnect',
         name: 'settings.walletconnect',
         component: SettingsWalletConnectView,
       }],
     }, {
-      path: 'add/:cryptoId([a-z0-9-_]+@[a-z0-9-]+)?',
+      path: `add/${CRYPTO_ID}?`,
       name: 'crypto.add',
       component: CryptoAddView,
     }, {
-      path: ':cryptoId([a-z0-9-_]+@[a-z0-9-]+)',
+      path: CRYPTO_ID,
       meta: { crypto: true },
       children: [
         {
@@ -116,6 +124,14 @@ const app = [
         {
           path: 'exchange',
           name: 'crypto.exchange',
+          redirect: {
+            name: 'crypto.swap',
+            force: true,
+          },
+        },
+        {
+          path: 'swap',
+          name: 'crypto.swap',
           component: CryptoExchangeView,
         },
         {
@@ -128,10 +144,15 @@ const app = [
           name: 'crypto.eossetup',
           component: CryptoEosSetupView,
         },
+        {
+          path: 'staking',
+          name: 'crypto.staking',
+          component: CryptoStakingView,
+        },
       ],
     }, {
       //path: 'bip21/:data',
-      path: ':cryptoId([a-z0-9-_]+@[a-z0-9-]+)?/bip21/:data',
+      path: `${CRYPTO_ID}?/bip21/:data`,
       redirect(to) {
         try {
           const parsed = parseCryptoURI(to.params.data);
@@ -142,7 +163,7 @@ const app = [
               query: {
                 address: parsed.address,
                 amount: parsed.amount,
-                destinationTag: ChangellyExchange.EXTRA_ID.includes(crypto._id) ? parsed.destinationTag : undefined,
+                destinationTag: BaseExchange.EXTRA_ID.includes(crypto._id) ? parsed.destinationTag : undefined,
               },
               params: {
                 cryptoId: crypto._id,
@@ -160,6 +181,15 @@ const app = [
       },
     }],
     meta: { requiresAuth: true },
+  },
+  {
+    path: '/wc',
+    redirect() {
+      return {
+        name: 'settings.walletconnect',
+        force: true,
+      };
+    },
   },
   {
     path: '/:pathMatch(.*)*',

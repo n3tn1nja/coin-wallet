@@ -38,10 +38,11 @@ export default {
       this.isLoading = true;
       this.error = undefined;
       try {
-        await this.$account.exchange.validateAddress({
+        await this.$account.exchanges.validateAddress({
           to: this.storage.to.crypto._id,
           address: this.storage.address,
           extraId: this.extraId,
+          provider: this.storage.provider,
         });
         this.updateStorage({
           extraId: this.extraId,
@@ -67,7 +68,7 @@ export default {
 
 <template>
   <MainLayout
-    :title="$t('Exchange {symbol}', { symbol: $wallet.crypto.symbol })"
+    :title="$t('Swap {symbol}', { symbol: $wallet.crypto.symbol })"
     :description="subtitle"
   >
     <CsFormGroup class="&__container">

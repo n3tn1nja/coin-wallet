@@ -7,10 +7,6 @@ export default {
       type: Number,
       default: 0,
     },
-    marketState: {
-      type: Symbol,
-      default: undefined,
-    },
   },
   computed: {
     amount() {
@@ -19,8 +15,8 @@ export default {
       return `${this.$wallet.balance} ${this.$wallet.crypto.symbol}`;
     },
     fiat() {
-      if (this.$walletState === this.$STATE_LOADING || this.marketState === this.$STATE_LOADING) return '...';
-      if (this.$walletState === this.$STATE_ERROR || this.marketState === this.$STATE_ERROR) return '⚠️';
+      if (this.$walletState === this.$STATE_LOADING) return '...';
+      if (this.$walletState === this.$STATE_ERROR) return '⚠️';
       const fiat = cryptoToFiat(this.$wallet.balance, this.price);
       return this.$c(fiat);
     },
@@ -46,6 +42,12 @@ export default {
         :title="amount"
       >
         {{ $isHiddenBalance ? '*****' : amount }}
+        <a
+          v-if="$wallet.crypto._id === 'monero@monero' && $wallet.balance.value === 0n && !$isHiddenBalance"
+          @click.stop="$safeOpen('https://support.coin.space/hc/en-us/articles/38917242800532')"
+        >
+          {{ $t('Support') }}
+        </a>
       </div>
       <div
         v-if="$wallet.crypto.coingecko"
@@ -82,6 +84,9 @@ export default {
       @include text-md;
       @include text-bold;
       @include ellipsis;
+
+      display: flex;
+      gap: $spacing-xs;
     }
 
     &__fiat {
